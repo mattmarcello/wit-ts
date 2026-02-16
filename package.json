@@ -1,0 +1,36 @@
+{
+	"name": "wit-ts",
+	"version": "0.0.1",
+	"description": "A standalone WIT (WebAssembly Interface Types) parser for TypeScript — runtime and type-level.",
+	"type": "module",
+	"main": "./dist/cjs/index.js",
+	"module": "./dist/esm/index.js",
+	"types": "./dist/esm/index.d.ts",
+	"exports": {
+		".": {
+			"import": {
+				"types": "./dist/esm/index.d.ts",
+				"default": "./dist/esm/index.js"
+			},
+			"require": {
+				"types": "./dist/cjs/index.d.cts",
+				"default": "./dist/cjs/index.cjs"
+			}
+		}
+	},
+	"files": ["dist"],
+	"scripts": {
+		"build": "pnpm build:esm && pnpm build:cjs",
+		"build:esm": "rm -rf dist/esm && tsc -p tsconfig.build.json --outDir dist/esm",
+		"build:cjs": "rm -rf dist/cjs && tsc -p tsconfig.build.json --outDir dist/cjs --module commonjs --moduleResolution node --declaration --declarationMap --verbatimModuleSyntax false && cd dist/cjs && for f in $(find . -name '*.js'); do mv \"$f\" \"${f%.js}.cjs\"; done && for f in $(find . -name '*.d.ts'); do mv \"$f\" \"${f%.d.ts}.d.cts\"; done",
+		"check": "biome check --write",
+		"check:types": "tsc --noEmit",
+		"format": "biome format --write",
+		"test": "vitest"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.2.7",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.1"
+	}
+}
