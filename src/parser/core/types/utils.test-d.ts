@@ -80,6 +80,10 @@ test("ParseWitParameter", () => {
     name: "a",
     type: "option<list<result<string, error>>>",
     internalType: "option<list<result<string, error>>>",
+    components: [
+      { type: "string", internalType: "string" },
+      { type: "error", internalType: "error" },
+    ],
   });
 
   assertType<
@@ -96,6 +100,33 @@ test("ParseWitParameter", () => {
         type: "list<record>",
         internalType: "list<bb>",
         components: [{ type: "u32", name: "a" }, { type: "u32", name: "b" }],
+      },
+    ],
+  });
+
+  assertType<ParseWitParameter<"a: tuple<u32, string>">>({
+    name: "a",
+    type: "tuple<u32, string>",
+    internalType: "tuple<u32, string>",
+    components: [
+      { type: "u32", internalType: "u32" },
+      { type: "string", internalType: "string" },
+    ],
+  });
+
+  assertType<ParseWitParameter<"a: tuple<u32, aa>", OptionsWithRecords>>({
+    name: "a",
+    type: "tuple<u32, record>",
+    internalType: "tuple<u32, aa>",
+    components: [
+      { type: "u32", internalType: "u32" },
+      {
+        type: "record",
+        internalType: "aa",
+        components: [
+          { name: "a", type: "u64" },
+          { name: "b", type: "string" },
+        ],
       },
     ],
   });
@@ -180,6 +211,26 @@ test("ParseSignature", () => {
         components: [
           { type: "u64", name: "a" },
           { type: "string", name: "b" },
+        ],
+      },
+    ],
+  });
+
+  assertType<
+    ParseSignature<"i: func(a: u32) -> tuple<u32, string>;">
+  >({
+    type: "function",
+    name: "i",
+    inputs: [
+      { name: "a", type: "u32", internalType: "u32" },
+    ],
+    outputs: [
+      {
+        type: "tuple<u32, string>",
+        internalType: "tuple<u32, string>",
+        components: [
+          { type: "u32", internalType: "u32" },
+          { type: "string", internalType: "string" },
         ],
       },
     ],

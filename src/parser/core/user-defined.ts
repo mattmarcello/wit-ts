@@ -247,7 +247,7 @@ export function parseTypes(signatures: readonly string[]) {
   };
 }
 
-type WitWrapper = "borrow" | "list" | "option" | "result";
+type WitWrapper = "borrow" | "list" | "option" | "result" | "tuple";
 
 type ExecWitType =
   | { wrapper?: Exclude<WitWrapper, "result">; base: string }
@@ -271,6 +271,9 @@ export const witResultRegex =
 
 export const witTypeRegex =
   /^(?:(?<wrapper>borrow|list|option)\s*<\s*(?<wrapped>[\s\S]+?)\s*>|(?<base>[a-zA-Z$_][a-zA-Z0-9$_-]*))$/;
+
+const multiElementRegex =
+  /^(?<wrapper>result|tuple)\s*<\s*(?<inner>[\s\S]+)\s*>$/;
 
 export function execWitType(type: string): ExecWitType {
   const t = type.trim();
@@ -324,6 +327,85 @@ function assertNoCollisions(
   }
 }
 
+function resolveSingleType(
+  typeName: string,
+  records: RecordLookup,
+  variants: VariantLookup,
+  enums: EnumLookup,
+  flags: FlagsLookup,
+  ancestors: Set<string>,
+): WitParameter {
+  const trimmed = typeName.trim();
+
+  // Check for single-element wrappers (list, option, borrow) wrapping a user-defined type
+  const m = execWitType(trimmed);
+  if (!m?.base) return { type: trimmed, internalType: trimmed };
+
+  const base = m.base.trim();
+
+  if (base in records) {
+    if (ancestors.has(base)) {
+      throw new Error(`Circular reference detected at "${base}".`);
+    }
+    return {
+      type: m.wrapper ? `${m.wrapper}<record>` : "record",
+      internalType: m.wrapper ? `${m.wrapper}<${base}>` : base,
+      components: resolveTypes(
+        records[base] ?? [],
+        records, variants, enums, flags,
+        new Set([...ancestors, base]),
+      ),
+    };
+  }
+
+  if (base in variants) {
+    if (ancestors.has(base)) {
+      throw new Error(`Circular reference detected at "${base}".`);
+    }
+    return {
+      type: m.wrapper ? `${m.wrapper}<variant>` : "variant",
+      internalType: m.wrapper ? `${m.wrapper}<${base}>` : base,
+      components: resolveTypes(
+        variants[base] ?? [],
+        records, variants, enums, flags,
+        new Set([...ancestors, base]),
+      ),
+    };
+  }
+
+  if (base in enums) {
+    if (ancestors.has(base)) {
+      throw new Error(`Circular reference detected at "${base}".`);
+    }
+    const enumCases = enums[base]!.map((caseName) => ({
+      name: caseName,
+      type: "_",
+    }));
+    return {
+      type: m.wrapper ? `${m.wrapper}<enum>` : "enum",
+      internalType: m.wrapper ? `${m.wrapper}<${base}>` : base,
+      components: enumCases as WitParameter[],
+    };
+  }
+
+  if (base in flags) {
+    if (ancestors.has(base)) {
+      throw new Error(`Circular reference detected at "${base}".`);
+    }
+    const flagsCases = flags[base]!.map((caseName) => ({
+      name: caseName,
+      type: "_",
+    }));
+    return {
+      type: m.wrapper ? `${m.wrapper}<flags>` : "flags",
+      internalType: m.wrapper ? `${m.wrapper}<${base}>` : base,
+      components: flagsCases as WitParameter[],
+    };
+  }
+
+  return { type: trimmed, internalType: trimmed };
+}
+
 function resolveTypes(
   witParameters: readonly (WitParameter & { indexed?: true })[],
   records: RecordLookup,
@@ -335,118 +417,95 @@ function resolveTypes(
   const components: WitParameter[] = [];
 
   for (const witParameter of witParameters) {
+    // Check for multi-element wrappers (result, tuple) first
+    const mew = witParameter.type.match(multiElementRegex);
+    if (mew?.groups) {
+      const wrapper = mew.groups.wrapper!;
+      const inner = mew.groups.inner!;
+      const parts = splitParameters(inner);
+
+      const resolved = parts.map((part) =>
+        resolveSingleType(part, records, variants, enums, flags, ancestors),
+      );
+
+      const resolvedTypeSig = resolved.map((r) => r.type).join(", ");
+      components.push({
+        ...witParameter,
+        type: `${wrapper}<${resolvedTypeSig}>`,
+        internalType: witParameter.internalType ?? witParameter.type,
+        components: resolved,
+      });
+      continue;
+    }
+
+    // Single-element wrappers and direct types
     const m = execWitType(witParameter.type);
     if (!m?.base) throw new Error(`Invalid WIT type: ${witParameter.type}`);
 
     const base = m.base.trim();
 
-    // Check if it's a named record
     if (base in records) {
       if (ancestors.has(base)) {
         throw new Error(`Circular reference detected at "${base}".`);
       }
-
       components.push({
         ...witParameter,
-        type: m.wrapper
-          ? m.wrapper === "result"
-            ? `result<record, error>`
-            : `${m.wrapper}<record>`
-          : "record",
+        type: m.wrapper ? `${m.wrapper}<record>` : "record",
         components: resolveTypes(
           records[base] ?? [],
-          records,
-          variants,
-          enums,
-          flags,
+          records, variants, enums, flags,
           new Set([...ancestors, base]),
         ),
       });
       continue;
     }
 
-    // Check if it's a named variant
     if (base in variants) {
       if (ancestors.has(base)) {
         throw new Error(`Circular reference detected at "${base}".`);
       }
-
       components.push({
         ...witParameter,
-        type: m.wrapper
-          ? m.wrapper === "result"
-            ? `result<variant, error>`
-            : `${m.wrapper}<variant>`
-          : "variant",
-        internalType: m.wrapper
-          ? m.wrapper === "result"
-            ? `result<${base}, error>`
-            : `${m.wrapper}<${base}>`
-          : base,
+        type: m.wrapper ? `${m.wrapper}<variant>` : "variant",
+        internalType: m.wrapper ? `${m.wrapper}<${base}>` : base,
         components: resolveTypes(
           variants[base] ?? [],
-          records,
-          variants,
-          enums,
-          flags,
+          records, variants, enums, flags,
           new Set([...ancestors, base]),
         ),
       });
       continue;
     }
 
-    // Check if it's a named enum
     if (base in enums) {
       if (ancestors.has(base)) {
         throw new Error(`Circular reference detected at "${base}".`);
       }
-
-      // Convert enum values to WitParameters for consistency
       const enumCases = enums[base]!.map((caseName) => ({
         name: caseName,
-        type: "_", // Unit type
+        type: "_",
       }));
-
       components.push({
         ...witParameter,
-        type: m.wrapper
-          ? m.wrapper === "result"
-            ? `result<enum, error>`
-            : `${m.wrapper}<enum>`
-          : "enum",
-        internalType: m.wrapper
-          ? m.wrapper === "result"
-            ? `result<${base}, error>`
-            : `${m.wrapper}<${base}>`
-          : base,
+        type: m.wrapper ? `${m.wrapper}<enum>` : "enum",
+        internalType: m.wrapper ? `${m.wrapper}<${base}>` : base,
         components: enumCases as WitParameter[],
       });
       continue;
     }
 
-    // Check if it's a named flags
     if (base in flags) {
       if (ancestors.has(base)) {
         throw new Error(`Circular reference detected at "${base}".`);
       }
-
       const flagsCases = flags[base]!.map((caseName) => ({
         name: caseName,
         type: "_",
       }));
-
       components.push({
         ...witParameter,
-        type: m.wrapper
-          ? m.wrapper === "result"
-            ? `result<flags, error>`
-            : `${m.wrapper}<flags>`
-          : "flags",
-        internalType: m.wrapper
-          ? m.wrapper === "result"
-            ? `result<${base}, error>`
-            : `${m.wrapper}<${base}>`
-          : base,
+        type: m.wrapper ? `${m.wrapper}<flags>` : "flags",
+        internalType: m.wrapper ? `${m.wrapper}<${base}>` : base,
         components: flagsCases as WitParameter[],
       });
       continue;

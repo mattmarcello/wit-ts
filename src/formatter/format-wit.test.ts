@@ -38,8 +38,15 @@ describe("formatWitParameter", () => {
         type: "result<record, error>",
         internalType: "result<aa, error>",
         components: [
-          { name: "a", type: "u32", internalType: "u32" },
-          { name: "b", type: "u32", internalType: "u32" },
+          {
+            type: "record",
+            internalType: "aa",
+            components: [
+              { name: "a", type: "u32", internalType: "u32" },
+              { name: "b", type: "u32", internalType: "u32" },
+            ],
+          },
+          { type: "error", internalType: "error" },
         ],
       }),
     ).toBe("result<aa, error>");
@@ -201,6 +208,20 @@ describe("formatWit", () => {
     expect(result).toContain("enum ee { x, y }");
     expect(result).toContain("f: func(a: aa, b: ee) -> u64;");
     expect(result).toContain("g: func() -> option<aa>;");
+  });
+});
+
+describe("formatWit - tuple", () => {
+  test("round-trips tuple", () => {
+    const sigs = [
+      "record aa { a: u32, b: u32 }",
+      "f: func(x: tuple<aa, string>) -> tuple<u32, u64>;",
+    ] as const;
+
+    const parsed = parseWit(sigs);
+    const formatted = formatWit(parsed);
+    const reparsed = parseWit(formatted);
+    expect(reparsed).toEqual(parsed);
   });
 });
 

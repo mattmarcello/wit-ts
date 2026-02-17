@@ -60,13 +60,15 @@ type FormatEnumCases<params extends readonly WitParameter[]> = {
 
 // Extract the base type from a wrapper type
 type ExtractBaseType<T extends string> =
-  T extends `result<${infer Inner}, error>`
-    ? Inner
-    : T extends `list<${infer Inner}>`
-      ? Inner
-      : T extends `option<${infer Inner}>`
+  T extends `result<${string}>`
+    ? T
+    : T extends `tuple<${string}>`
+      ? T
+      : T extends `list<${infer Inner}>`
         ? Inner
-        : T;
+        : T extends `option<${infer Inner}>`
+          ? Inner
+          : T;
 
 // Extract the user-defined type name from internalType
 type ExtractTypeName<param extends WitParameter> = param extends {
@@ -109,7 +111,19 @@ type IsUserDefinedType<T extends string> = ExtractBaseType<T> extends
   | "enum"
   | "flags"
   ? true
-  : false;
+  : IsMultiElementWithUserDefined<T>;
+
+type IsMultiElementWithUserDefined<T extends string> =
+  T extends `${"result" | "tuple"}<${string}${"record" | "variant" | "enum" | "flags"}${string}>`
+    ? true
+    : false;
+
+type WrapFormatTypeDefinition<
+  name extends string,
+  param extends WitParameter,
+> = [FormatTypeDefinition<name, param>] extends [never]
+  ? []
+  : [FormatTypeDefinition<name, param>];
 
 // Collect type definitions from parameters (recursive, with dedup via Seen union)
 export type CollectTypeDefinitions<
@@ -126,7 +140,7 @@ export type CollectTypeDefinitions<
           ? CollectTypeDefinitions<tail, seen>
           : [
               ...CollectTypeDefinitions<C, seen | name>,
-              FormatTypeDefinition<name, head>,
+              ...WrapFormatTypeDefinition<name, head>,
               ...CollectTypeDefinitions<tail, seen | name>,
             ]
         : CollectTypeDefinitions<tail, seen>

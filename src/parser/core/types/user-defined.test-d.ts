@@ -65,7 +65,15 @@ test("ParseRecords - with generics", () => {
     bb: readonly [
       { readonly name: "p"; readonly type: "list<aa>"; readonly internalType: "list<aa>" },
       { readonly name: "q"; readonly type: "option<aa>"; readonly internalType: "option<aa>" },
-      { readonly name: "r"; readonly type: "result<aa, error>"; readonly internalType: "result<aa, error>" },
+      {
+        readonly name: "r";
+        readonly type: "result<aa, error>";
+        readonly internalType: "result<aa, error>";
+        readonly components: readonly [
+          { readonly type: "aa"; readonly internalType: "aa" },
+          { readonly type: "error"; readonly internalType: "error" },
+        ];
+      },
     ];
   }>();
 });

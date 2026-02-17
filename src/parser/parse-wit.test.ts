@@ -68,8 +68,15 @@ describe("parseWit (runtime)", () => {
             type: "result<record, error>",
             internalType: "result<aa, error>",
             components: [
-              { name: "a", type: "u32", internalType: "u32" },
-              { name: "b", type: "u32", internalType: "u32" },
+              {
+                type: "record",
+                internalType: "aa",
+                components: [
+                  { name: "a", type: "u32", internalType: "u32" },
+                  { name: "b", type: "u32", internalType: "u32" },
+                ],
+              },
+              { type: "error", internalType: "error" },
             ],
           },
         ],
@@ -141,8 +148,15 @@ test("ParseWit - function with record params and result return", () => {
         readonly type: "result<record, error>";
         readonly internalType: "result<aa, error>";
         readonly components: readonly [
-          { readonly name: "a"; readonly type: "u32"; readonly internalType: "u32" },
-          { readonly name: "b"; readonly type: "u32"; readonly internalType: "u32" },
+          {
+            readonly type: "record";
+            readonly internalType: "aa";
+            readonly components: readonly [
+              { readonly name: "a"; readonly type: "u32"; readonly internalType: "u32" },
+              { readonly name: "b"; readonly type: "u32"; readonly internalType: "u32" },
+            ];
+          },
+          { readonly type: "error"; readonly internalType: "error" },
         ];
       },
     ];
@@ -219,6 +233,12 @@ test("ParseWit - function with variant input", () => {
   expectTypeOf<F["inputs"][0]["components"]["length"]>().toEqualTypeOf<3>();
   expectTypeOf<F["outputs"]["length"]>().toEqualTypeOf<1>();
   expectTypeOf<F["outputs"][0]["type"]>().toEqualTypeOf<"result<string, error>">();
+  expectTypeOf<F["outputs"][0]["components"]>().toEqualTypeOf<
+    readonly [
+      { readonly type: "string"; readonly internalType: "string" },
+      { readonly type: "error"; readonly internalType: "error" },
+    ]
+  >();
 });
 
 describe("parseWit - parameter cache", () => {

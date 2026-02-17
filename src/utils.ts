@@ -103,6 +103,9 @@ type MaybeExtractOptionParameterType<T> = T extends `option<${infer Inner}>`
 type MaybeExtractResultParameterType<T> =
   T extends `result<${infer Ok}, ${infer Err}>` ? [Ok, Err] : undefined;
 
+type MaybeExtractTupleParameterType<T> =
+  T extends `tuple<${string}>` ? true : undefined;
+
 type WitListToPrimitiveType<
   witParameter extends WitParameter | { name: string; type: unknown },
   witParameterKind extends WitParameterKind,
@@ -129,17 +132,20 @@ type WitOptionToPrimitiveType<
 type WitResultToPrimitiveType<
   witParameter extends WitParameter | { name: string; type: unknown },
   witParameterKind extends WitParameterKind,
-  ok extends string,
-> =
-  Result<
-    WitParameterToPrimitiveType<
-      Merge<witParameter, { type: ok }>,
-      witParameterKind
-    >,
-    WitError.T
-  > extends infer R
-    ? R
-    : never;
+> = witParameter extends {
+  components: readonly [infer Ok extends WitParameter, infer Err extends WitParameter];
+}
+  ? Result<WitParameterToPrimitiveType<Ok, witParameterKind>, WitParameterToPrimitiveType<Err, witParameterKind>>
+  : Result<unknown, unknown>;
+
+type WitTupleToPrimitiveType<
+  witParameter extends WitParameter | { name: string; type: unknown },
+  witParameterKind extends WitParameterKind,
+> = witParameter extends {
+  components: infer C extends readonly WitParameter[];
+}
+  ? { [K in keyof C]: WitParameterToPrimitiveType<C[K], witParameterKind> }
+  : unknown[];
 
 export type WitParameterToPrimitiveType<
   witParameter extends WitParameter | { name: string; type: unknown },
@@ -187,15 +193,18 @@ export type WitParameterToPrimitiveType<
               ? WitOptionToPrimitiveType<witParameter, witParameterKind, inner>
               : // 7. result<Ok, Err>
                 MaybeExtractResultParameterType<witParameter["type"]> extends [
-                    infer ok extends string,
-                    infer _err extends "error",
+                    infer _ok extends string,
+                    infer _err extends string,
                   ]
-                ? WitResultToPrimitiveType<witParameter, witParameterKind, ok>
-                : ResolvedRegister["strictWitType"] extends true
-                  ? Error_<`Unknown type '${witParameter["type"] & string}'.`>
-                  : witParameter extends { components: Error_<string> }
-                    ? witParameter["components"]
-                    : unknown;
+                ? WitResultToPrimitiveType<witParameter, witParameterKind>
+                : // 8. tuple<...>
+                  MaybeExtractTupleParameterType<witParameter["type"]> extends true
+                  ? WitTupleToPrimitiveType<witParameter, witParameterKind>
+                  : ResolvedRegister["strictWitType"] extends true
+                    ? Error_<`Unknown type '${witParameter["type"] & string}'.`>
+                    : witParameter extends { components: Error_<string> }
+                      ? witParameter["components"]
+                      : unknown;
 
 type WitVariantToPrimitiveType<
   components extends readonly WitParameter[],

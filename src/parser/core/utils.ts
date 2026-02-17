@@ -62,7 +62,7 @@ export const witParameterSeed: ReadonlyMap<string, WitParameter> = new Map([
 ]);
 
 export const witParameterRegex =
-  /^(?:(?<name>[a-z][a-z0-9-]*)\s*:\s*)?(?<type>_|(?:borrow|list|option|result)\s*<[\s\S]+>|[a-z][a-z0-9-]*|(?:record|variant|flags|enum)\s*\{[\s\S]*\})$/;
+  /^(?:(?<name>[a-z][a-z0-9-]*)\s*:\s*)?(?<type>_|(?:borrow|list|option|result|tuple)\s*<[\s\S]+>|[a-z][a-z0-9-]*|(?:record|variant|flags|enum)\s*\{[\s\S]*\})$/;
 
 export function isGeneric(type: string): boolean {
   return isGenericRegex.test(type.trim());
@@ -141,19 +141,17 @@ export function parseWitParameter(param: string, options?: ParseOptions) {
         break;
       }
 
-      case "result": {
-        if (parsed.length !== 2) {
-          throw new InvalidWitParameterError({
-            param,
-          });
+      case "result":
+      case "tuple": {
+        if (g.outer === "result" && parsed.length !== 2) {
+          throw new InvalidWitParameterError({ param });
         }
-        const left = parsed[0]!;
+        if (g.outer === "tuple" && parsed.length < 1) {
+          throw new InvalidWitParameterError({ param });
+        }
 
-        type = `result<${innerTypeSig}>`;
-
-        components = {
-          ...(left.components && { components: left.components }),
-        };
+        type = `${g.outer}<${innerTypeSig}>`;
+        components = { components: parsed };
         break;
       }
 

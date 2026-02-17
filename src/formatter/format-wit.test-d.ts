@@ -36,7 +36,14 @@ test("FormatWitParameter - wrapped type", () => {
       type: "result<record, error>";
       internalType: "result<aa, error>";
       components: readonly [
-        { name: "x"; type: "u32"; internalType: "u32" },
+        {
+          type: "record";
+          internalType: "aa";
+          components: readonly [
+            { name: "x"; type: "u32"; internalType: "u32" },
+          ];
+        },
+        { type: "error"; internalType: "error" },
       ];
     }>
   >("result<aa, error>" as const);

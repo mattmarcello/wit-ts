@@ -19,11 +19,11 @@ export function formatFunctionSignature(fn: WitFunction): string {
 }
 
 function extractBaseName(internalType: string): string | null {
-  // result<name, error>
-  const resultMatch = internalType.match(
-    /^result<\s*([a-zA-Z][a-zA-Z0-9-]*)\s*,\s*error\s*>$/,
+  // result<name, error> or tuple<name, ...>
+  const multiMatch = internalType.match(
+    /^(?:result|tuple)<\s*([a-zA-Z][a-zA-Z0-9-]*)\s*(?:,[\s\S]*)?>$/,
   );
-  if (resultMatch) return resultMatch[1]!;
+  if (multiMatch) return multiMatch[1]!;
 
   // list<name> or option<name>
   const wrapperMatch = internalType.match(
@@ -41,7 +41,7 @@ function isUserDefinedType(type: string): boolean {
     type === "enum" ||
     type === "flags" ||
     /^(?:list|option)<(?:record|variant|enum|flags)>$/.test(type) ||
-    /^result<(?:record|variant|enum|flags), error>$/.test(type)
+    /^(?:result|tuple)<[\s\S]*(?:record|variant|enum|flags)[\s\S]*>$/.test(type)
   );
 }
 
@@ -62,11 +62,8 @@ function formatTypeDefinition(
     param.type === "flags"
       ? param.type
       : param.type.match(
-            /^(?:list|option)<(record|variant|enum|flags)>$|^result<(record|variant|enum|flags), error>$/,
-          )?.[1] ??
-        param.type.match(
-          /^(?:list|option)<(record|variant|enum|flags)>$|^result<(record|variant|enum|flags), error>$/,
-        )?.[2];
+            /^(?:list|option)<(record|variant|enum|flags)>$/,
+          )?.[1];
 
   if (!baseType || !param.components) return null;
 

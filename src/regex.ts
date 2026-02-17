@@ -4,4 +4,4 @@ export function execTyped<type>(regex: RegExp, string: string) {
 }
 
 export const isGenericRegex =
-  /^(?<outer>borrow|list|option|result)\s*<(?<inner>[\s\S]+)>\s*$/;
+  /^(?<outer>borrow|list|option|result|tuple)\s*<(?<inner>[\s\S]+)>\s*$/;

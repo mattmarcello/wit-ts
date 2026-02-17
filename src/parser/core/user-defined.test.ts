@@ -128,8 +128,15 @@ describe("parseTypes - records", () => {
           type: "result<record, error>",
           internalType: "result<aa, error>",
           components: [
-            { name: "a", type: "u32", internalType: "u32" },
-            { name: "b", type: "u32", internalType: "u32" },
+            {
+              type: "record",
+              internalType: "aa",
+              components: [
+                { name: "a", type: "u32", internalType: "u32" },
+                { name: "b", type: "u32", internalType: "u32" },
+              ],
+            },
+            { type: "error", internalType: "error" },
           ],
         },
       ],

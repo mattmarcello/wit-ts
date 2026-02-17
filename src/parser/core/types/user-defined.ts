@@ -1,5 +1,5 @@
 import type { WitParameter } from "../../../wit.js";
-import type { Trim } from "../../../type-utils.js";
+import type { Trim, Join } from "../../../type-utils.js";
 import type {
   RecordSignature,
   VariantSignature,
@@ -187,6 +187,58 @@ export type ParseRecordProperties<
 // Unified Type Resolution
 // ============================================================================
 
+type ResolveElement<
+  typeName extends string,
+  records extends ComponentLookup | unknown,
+  variants extends ComponentLookup | unknown,
+  enums extends EnumLookup | unknown,
+  flags extends FlagsLookup | unknown,
+  keyReferences extends { [_: string]: unknown } | unknown,
+> = ResolveDirectType<
+  { readonly type: Trim<typeName>; readonly name: undefined },
+  records, variants, enums, flags, keyReferences
+> extends infer R extends { type: string }
+  ? Omit<R, "name">
+  : { readonly type: Trim<typeName>; readonly internalType: Trim<typeName> };
+
+type ResolveMultiElements<
+  parts extends readonly string[],
+  records extends ComponentLookup | unknown,
+  variants extends ComponentLookup | unknown,
+  enums extends EnumLookup | unknown,
+  flags extends FlagsLookup | unknown,
+  keyReferences extends { [_: string]: unknown } | unknown,
+> = readonly [...{
+  [K in keyof parts]: ResolveElement<
+    parts[K] & string, records, variants, enums, flags, keyReferences
+  >;
+}];
+
+type ExtractElementTypes<elements extends readonly { type: string }[]> = {
+  [K in keyof elements]: elements[K]["type"];
+} extends infer R extends readonly string[] ? R : never;
+
+type ResolveMultiElementType<
+  param extends WitParameter & { type: string },
+  wrapper extends string,
+  inner extends string,
+  records extends ComponentLookup | unknown,
+  variants extends ComponentLookup | unknown,
+  enums extends EnumLookup | unknown,
+  flags extends FlagsLookup | unknown,
+  keyReferences extends { [_: string]: unknown } | unknown,
+> = SplitParameters<Trim<inner>> extends infer parts extends readonly string[]
+  ? ResolveMultiElements<parts, records, variants, enums, flags, keyReferences> extends
+    infer elements extends readonly { type: string }[]
+    ? {
+        readonly name: param["name"];
+        readonly type: `${wrapper}<${Join<ExtractElementTypes<elements>>}>`;
+        readonly internalType: param["type"];
+        readonly components: elements;
+      }
+    : param
+  : param;
+
 export type ResolveTypes<
   witParameters extends readonly (WitParameter & { type: string })[],
   records extends ComponentLookup | unknown = unknown,
@@ -196,7 +248,7 @@ export type ResolveTypes<
   keyReferences extends { [_: string]: unknown } | unknown = unknown,
 > = readonly [
   ...{
-    [key in keyof witParameters]: witParameters[key]["type"] extends  // Handle wrapped types (list<T>, option<T>, result<T, error>)
+    [key in keyof witParameters]: witParameters[key]["type"] extends  // Handle wrapped types (list<T>, option<T>)
     `list<${infer inner}>`
       ? ResolveWrappedType<
           witParameters[key],
@@ -230,8 +282,9 @@ export type ResolveTypes<
               flags,
               keyReferences
             >
-          : witParameters[key]["type"] extends `result<${infer inner}, error>`
-            ? ResolveWrappedType<
+          : // Multi-element wrappers (result, tuple)
+            witParameters[key]["type"] extends `result<${infer inner}>`
+            ? ResolveMultiElementType<
                 witParameters[key],
                 "result",
                 inner,
@@ -241,15 +294,26 @@ export type ResolveTypes<
                 flags,
                 keyReferences
               >
-            : // Handle direct type references
-              ResolveDirectType<
-                witParameters[key],
-                records,
-                variants,
-                enums,
-                flags,
-                keyReferences
-              >;
+            : witParameters[key]["type"] extends `tuple<${infer inner}>`
+              ? ResolveMultiElementType<
+                  witParameters[key],
+                  "tuple",
+                  inner,
+                  records,
+                  variants,
+                  enums,
+                  flags,
+                  keyReferences
+                >
+              : // Handle direct type references
+                ResolveDirectType<
+                  witParameters[key],
+                  records,
+                  variants,
+                  enums,
+                  flags,
+                  keyReferences
+                >;
   },
 ];
 

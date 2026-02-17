@@ -1,4 +1,4 @@
-import type { Trim, Prettify } from "../../../type-utils.js";
+import type { Trim, Prettify, Join } from "../../../type-utils.js";
 import type { IsFunctionSignature } from "./signatures.js";
 import type { Error_ } from "../../../error.js";
 import type {
@@ -160,15 +160,16 @@ type AsUserDefinedType<
           : AsUserDefinedFallback<T, Opts>
         : AsUserDefinedFallback<T, Opts>;
 
-type SplitResultInner<S extends string> = S extends `${infer L}, ${infer R}`
-  ? [Trim<L>, Trim<R>]
-  : S extends `${infer L},${infer R}`
-    ? [Trim<L>, Trim<R>]
-    : never;
-type MaybeResultComponents<
-  Ok extends { type: string },
-  _Err extends { type: string },
-> = Ok extends { components: infer _C } ? GetComponents<Ok> : {};
+type MapMultiElements<
+  parts extends readonly string[],
+  Opts extends ParseOptions,
+> = readonly [...{
+  [K in keyof parts]: MapGenericType<Trim<parts[K] & string>, Opts>;
+}];
+
+type ExtractTypes<elements extends readonly { type: string }[]> = {
+  [K in keyof elements]: elements[K]["type"];
+} extends infer R extends readonly string[] ? R : never;
 
 type MapGenericType<T extends string, Opts extends ParseOptions> =
   // list<...>
@@ -184,29 +185,30 @@ type MapGenericType<T extends string, Opts extends ParseOptions> =
             { type: `option<${M["type"]}>`; internalType: T } & GetComponents<M>
           >
         : never
-      : // result<L, R>
+      : // result<L, R> — elements-as-components
         T extends `result<${infer Inner}>`
-        ? SplitResultInner<Trim<Inner>> extends [
-            infer LRaw extends string,
-            infer RRaw extends string,
-          ]
-          ? MapGenericType<Trim<LRaw>, Opts> extends infer LMapped extends {
-              type: string;
-            }
-            ? MapGenericType<Trim<RRaw>, Opts> extends infer RMapped extends {
-                type: string;
-              }
-              ? Readonlyify<
-                  {
-                    type: `result<${LMapped["type"]}, ${RMapped["type"]}>`;
-                    internalType: T;
-                  } & MaybeResultComponents<LMapped, RMapped>
-                >
-              : never
+        ? SplitParameters<Trim<Inner>> extends infer parts extends readonly string[]
+          ? MapMultiElements<parts, Opts> extends infer elements extends readonly { type: string }[]
+            ? Readonlyify<{
+                type: `result<${Join<ExtractTypes<elements>>}>`;
+                internalType: T;
+                components: elements;
+              }>
             : never
           : never
-        : // scalar or record-mapped
-          AsUserDefinedType<T, Opts>;
+        : // tuple<...> — elements-as-components
+          T extends `tuple<${infer Inner}>`
+          ? SplitParameters<Trim<Inner>> extends infer parts extends readonly string[]
+            ? MapMultiElements<parts, Opts> extends infer elements extends readonly { type: string }[]
+              ? Readonlyify<{
+                  type: `tuple<${Join<ExtractTypes<elements>>}>`;
+                  internalType: T;
+                  components: elements;
+                }>
+              : never
+            : never
+          : // scalar or record-mapped
+            AsUserDefinedType<T, Opts>;
 
 export type ParseWitParameter<
   signature extends string,

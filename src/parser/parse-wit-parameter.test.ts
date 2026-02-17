@@ -29,9 +29,16 @@ test("ParseWitParameter - record type", () => {
     readonly type: "result<record, error>";
     readonly internalType: "result<aa, error>";
     readonly components: readonly [
-      { readonly name: "a"; readonly type: "u64"; readonly internalType: "u64" },
-      { readonly name: "b"; readonly type: "string"; readonly internalType: "string" },
-      { readonly name: "c"; readonly type: "option<list<u8>>"; readonly internalType: "option<list<u8>>" },
+      {
+        readonly type: "record";
+        readonly internalType: "aa";
+        readonly components: readonly [
+          { readonly name: "a"; readonly type: "u64"; readonly internalType: "u64" },
+          { readonly name: "b"; readonly type: "string"; readonly internalType: "string" },
+          { readonly name: "c"; readonly type: "option<list<u8>>"; readonly internalType: "option<list<u8>>" },
+        ];
+      },
+      { readonly type: "error"; readonly internalType: "error" },
     ];
   }>();
 });
@@ -103,8 +110,15 @@ test.each([
       type: "result<record, error>",
       internalType: "result<aa, error>",
       components: [
-        { name: "a", type: "u32", internalType: "u32" },
-        { name: "b", type: "u32", internalType: "u32" },
+        {
+          type: "record",
+          internalType: "aa",
+          components: [
+            { name: "a", type: "u32", internalType: "u32" },
+            { name: "b", type: "u32", internalType: "u32" },
+          ],
+        },
+        { type: "error", internalType: "error" },
       ],
     },
   },
@@ -191,9 +205,16 @@ test.each([
       type: "result<enum, error>",
       internalType: "result<ee, error>",
       components: [
-        { name: "x", type: "_", internalType: "_" },
-        { name: "y", type: "_", internalType: "_" },
-        { name: "z", type: "_", internalType: "_" },
+        {
+          type: "enum",
+          internalType: "ee",
+          components: [
+            { name: "x", type: "_", internalType: "_" },
+            { name: "y", type: "_", internalType: "_" },
+            { name: "z", type: "_", internalType: "_" },
+          ],
+        },
+        { type: "error", internalType: "error" },
       ],
     },
   },
@@ -221,6 +242,42 @@ test.each([
             { name: "z", type: "_" },
           ],
         },
+      ],
+    },
+  },
+  // Tuple test cases
+  {
+    signature: "a: tuple<u32, string>",
+    expected: {
+      name: "a",
+      type: "tuple<u32, string>",
+      internalType: "tuple<u32, string>",
+      components: [
+        { type: "u32", internalType: "u32" },
+        { type: "string", internalType: "string" },
+      ],
+    },
+  },
+  {
+    signature: [
+      "record aa { a: u32, b: u32 }",
+      "x: tuple<aa, string, u64>",
+    ],
+    expected: {
+      name: "x",
+      type: "tuple<record, string, u64>",
+      internalType: "tuple<aa, string, u64>",
+      components: [
+        {
+          type: "record",
+          internalType: "aa",
+          components: [
+            { name: "a", type: "u32", internalType: "u32" },
+            { name: "b", type: "u32", internalType: "u32" },
+          ],
+        },
+        { type: "string", internalType: "string" },
+        { type: "u64", internalType: "u64" },
       ],
     },
   },

@@ -19,8 +19,9 @@ type WitClient<wit extends Wit> = {
 const wit = [
   "record user { name: string, age: u32 }",
   "record post { title: string, body: string }",
+  "variant api-error { not-found, unauthorized(string) }",
   "get-user: func(id: u64) -> user;",
-  "create-post: func(author: user, post: post) -> result<post, error>;",
+  "create-post: func(author: user, post: post) -> result<post, api-error>;",
   "list-posts: func(limit: u32) -> list<post>;",
 ] as const;
 
@@ -37,7 +38,12 @@ test("WitClient - create-post has correct signature", () => {
     (
       author: { name: string; age: number },
       post: { title: string; body: string },
-    ) => Promise<Result<{ title: string; body: string }, unknown>>
+    ) => Promise<
+      Result<
+        { title: string; body: string },
+        ["not-found"] | ["unauthorized", string]
+      >
+    >
   >();
 });
 

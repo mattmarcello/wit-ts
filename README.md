@@ -31,8 +31,9 @@ import type {
 const wit = [
   "record user { name: string, age: u32 }",
   "record post { title: string, body: string }",
+  "variant api-error { not-found, unauthorized(string) }",
   "get-user: func(id: u64) -> user;",
-  "create-post: func(author: user, post: post) -> result<post, error>;",
+  "create-post: func(author: user, post: post) -> result<post, api-error>;",
   "list-posts: func(limit: u32) -> list<post>;",
 ] as const;
 
@@ -46,7 +47,7 @@ type WitClient<wit extends Wit> = {
 type MyClient = WitClient<ParseWit<typeof wit>>;
 //   ^? {
 //        "get-user":    (id: bigint) => Promise<{ name: string; age: number }>;
-//        "create-post": (author: { name: string; age: number }, post: { ... }) => Promise<["ok", { title: string; body: string }] | ["err", ...]>;
+//        "create-post": (author: ..., post: ...) => Promise<["ok", { title: string; body: string }] | ["err", ["not-found"] | ["unauthorized", string]]>;
 //        "list-posts":  (limit: number) => Promise<readonly { title: string; body: string }[]>;
 //      }
 ```
@@ -285,7 +286,7 @@ declare module "wit-ts" {
 | **Boolean** | `bool` |
 | **Integers** | `u8`, `u16`, `u32`, `u64`, `s8`, `s16`, `s32`, `s64` |
 | **String** | `string` |
-| **Generics** | `list<T>`, `option<T>`, `result<T, error>` |
+| **Generics** | `list<T>`, `option<T>`, `result<T, E>`, `tuple<T1, T2, ...>` |
 | **User-defined** | `record`, `variant`, `enum`, `flags` |
 
 ### Function signatures
