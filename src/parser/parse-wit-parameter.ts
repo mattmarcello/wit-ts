@@ -7,6 +7,7 @@ import {
   isRecordSignature,
   isVariantSignature,
   isEnumSignature,
+  isFlagsSignature,
 } from "./core/signatures.js";
 import type {
   IsRecordSignature,
@@ -87,17 +88,21 @@ export function parseWitParameter<
     witParameter = parseWitParameter_(param, {}) as ParseWitParameter<param>;
   else {
     const types = parseTypes(param as readonly string[]);
+    const cache = new Map<string, WitParameter>();
     const length = param.length as number;
     for (let i = 0; i < length; i++) {
       const signature = (param as readonly string[])[i]!;
       if (isRecordSignature(signature)) continue;
       if (isVariantSignature(signature)) continue;
       if (isEnumSignature(signature)) continue;
+      if (isFlagsSignature(signature)) continue;
 
       witParameter = parseWitParameter_(signature, {
         enums: types["enums"],
         variants: types["variants"],
         records: types["records"],
+        flags: types["flags"],
+        cache,
       });
       break;
     }

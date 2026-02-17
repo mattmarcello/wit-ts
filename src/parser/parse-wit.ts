@@ -1,4 +1,4 @@
-import type { Wit } from "../wit.js";
+import type { Wit, WitParameter } from "../wit.js";
 import type { Filter } from "../type-utils.js";
 import type { Error_ } from "../error.js";
 import {
@@ -53,6 +53,7 @@ export function parseWit<const signatures extends readonly string[]>(
       : Signatures<signatures>,
 ): ParseWit<signatures> {
   const types = parseTypes(signatures as readonly string[]);
+  const cache = new Map<string, WitParameter>();
   const wit = [];
   const length = signatures.length as number;
   for (let i = 0; i < length; i++) {
@@ -68,6 +69,7 @@ export function parseWit<const signatures extends readonly string[]>(
         types.variants,
         types.enums,
         types.flags,
+        cache,
       ),
     );
   }

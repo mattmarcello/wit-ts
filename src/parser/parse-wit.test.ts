@@ -221,6 +221,62 @@ test("ParseWit - function with variant input", () => {
   expectTypeOf<F["outputs"][0]["type"]>().toEqualTypeOf<"result<string, error>">();
 });
 
+describe("parseWit - parameter cache", () => {
+  test("shared parameter types across functions produce correct results", () => {
+    const out = parseWit([
+      "record point { x: s32, y: s32 }",
+      "a: func(p: point) -> point;",
+      "b: func(q: point, r: list<point>) -> option<point>;",
+      "c: func(x: u64, y: u64) -> u64;",
+    ]);
+
+    const pointComponents = [
+      { name: "x", type: "s32", internalType: "s32" },
+      { name: "y", type: "s32", internalType: "s32" },
+    ];
+
+    expect(out).toHaveLength(3);
+
+    // function a — input and output both use "point"
+    expect(out[0]).toEqual({
+      name: "a",
+      type: "function",
+      inputs: [
+        { name: "p", type: "record", internalType: "point", components: pointComponents },
+      ],
+      outputs: [
+        { type: "record", internalType: "point", components: pointComponents },
+      ],
+    });
+
+    // function b — different names, same types, plus generics wrapping point
+    expect(out[1]).toEqual({
+      name: "b",
+      type: "function",
+      inputs: [
+        { name: "q", type: "record", internalType: "point", components: pointComponents },
+        { name: "r", type: "list<record>", internalType: "list<point>", components: pointComponents },
+      ],
+      outputs: [
+        { type: "option<record>", internalType: "option<point>", components: pointComponents },
+      ],
+    });
+
+    // function c — primitive types shared across params
+    expect(out[2]).toEqual({
+      name: "c",
+      type: "function",
+      inputs: [
+        { name: "x", type: "u64", internalType: "u64" },
+        { name: "y", type: "u64", internalType: "u64" },
+      ],
+      outputs: [
+        { type: "u64", internalType: "u64" },
+      ],
+    });
+  });
+});
+
 describe("parseWit - flags", () => {
   test("parses function with flags parameter", () => {
     const out = parseWit([

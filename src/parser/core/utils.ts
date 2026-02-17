@@ -25,7 +25,44 @@ export type ParseOptions = {
   flags?: FlagsLookup;
   type?: WitItemType | "record" | "variant" | "enum" | "flags";
   ancestors?: Set<string>;
+  cache?: Map<string, WitParameter>;
 };
+
+/**
+ * Pre-seeded cache for common WIT primitive types.
+ * Skips regex + type resolution entirely for the most frequent scalars.
+ *
+ * Modeled after abitype's parameterCache approach.
+ * @see .references/abitype/packages/abitype/src/human-readable/runtime/cache.ts
+ */
+const primitiveParam = (type: string): WitParameter => ({
+  type,
+  internalType: type,
+});
+
+export const witParameterSeed: ReadonlyMap<string, WitParameter> = new Map([
+  // Boolean
+  ["bool", primitiveParam("bool")],
+  // Unsigned integers
+  ["u8", primitiveParam("u8")],
+  ["u16", primitiveParam("u16")],
+  ["u32", primitiveParam("u32")],
+  ["u64", primitiveParam("u64")],
+  // Signed integers
+  ["s8", primitiveParam("s8")],
+  ["s16", primitiveParam("s16")],
+  ["s32", primitiveParam("s32")],
+  ["s64", primitiveParam("s64")],
+  // Floats
+  ["f32", primitiveParam("f32")],
+  ["f64", primitiveParam("f64")],
+  // String / char
+  ["string", primitiveParam("string")],
+  ["char", primitiveParam("char")],
+  // Unit / error
+  ["_", primitiveParam("_")],
+  ["error", primitiveParam("error")],
+]);
 
 export const witParameterRegex =
   /^(?:(?<name>[a-z][a-z0-9-]*)\s*:\s*)?(?<type>_|(?:borrow|list|option|result)\s*<[\s\S]+>|[a-z][a-z0-9-]*|(?:record|variant|flags|enum)\s*\{[\s\S]*\})$/;
@@ -43,6 +80,12 @@ export function execGeneric<T extends { outer: string; inner: string }>(
 }
 
 export function parseWitParameter(param: string, options?: ParseOptions) {
+  // Fast path: check pre-seeded primitives before any regex work.
+  // Mirrors abitype's parameterCache pattern — the cache check is the very
+  // first thing, so common scalars like "u64" or "string" skip parsing entirely.
+  const seeded = witParameterSeed.get(param);
+  if (seeded) return seeded;
+
   const match = execTyped<{
     array?: string;
     name?: string;
@@ -55,6 +98,15 @@ export function parseWitParameter(param: string, options?: ParseOptions) {
 
   if (match.name && isWitKeyword(match.name))
     throw new WitProtectedKeywordError({ param, name: match.name });
+
+  const cache = options?.cache;
+  const cached = cache?.get(match.type);
+  if (cached) {
+    return {
+      ...cached,
+      ...(match.name ? { name: match.name } : {}),
+    } as WitParameter;
+  }
 
   const name = match.name ? { name: match.name } : {};
   const records = options?.records ?? {};
@@ -70,7 +122,7 @@ export function parseWitParameter(param: string, options?: ParseOptions) {
     const parts = splitParameters(g.inner);
 
     const parsed = parts.map((p) =>
-      parseWitParameter(p, { records, variants, enums, flags, ancestors }),
+      parseWitParameter(p, { records, variants, enums, flags, ancestors, ...(cache && { cache }) }),
     );
 
     // normalize inner types for the outer type string
@@ -140,6 +192,12 @@ export function parseWitParameter(param: string, options?: ParseOptions) {
     ...components,
   };
 
+  // store in cache keyed on the type string (without name)
+  if (cache) {
+    const { name: _, ...withoutName } = witParameter as WitParameter & { name?: string };
+    cache.set(match.type, withoutName as WitParameter);
+  }
+
   return witParameter;
 }
 export const witKeywordRegex =
@@ -199,9 +257,10 @@ export function parseSignature(
   variants: VariantLookup = {},
   enums: EnumLookup = {},
   flags: FlagsLookup = {},
+  cache?: Map<string, WitParameter>,
 ) {
   if (isFunctionSignature(signature))
-    return parseFunctionSignature(signature, records, variants, enums, flags);
+    return parseFunctionSignature(signature, records, variants, enums, flags, cache);
 
   throw new UnknownSignatureError({ signature });
 }
@@ -212,6 +271,7 @@ export function parseFunctionSignature(
   variants: VariantLookup = {},
   enums: EnumLookup = {},
   flags: FlagsLookup = {},
+  cache?: Map<string, WitParameter>,
 ) {
   const match = execFunctionSignature(signature);
   if (!match) throw new InvalidSignatureError({ signature, type: "func" });
@@ -227,6 +287,7 @@ export function parseFunctionSignature(
           variants,
           enums,
           flags,
+          ...(cache && { cache }),
         }),
       );
     }
@@ -243,6 +304,7 @@ export function parseFunctionSignature(
           variants,
           enums,
           flags,
+          ...(cache && { cache }),
         }),
       );
     }
