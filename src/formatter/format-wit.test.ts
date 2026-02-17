@@ -212,10 +212,46 @@ describe("formatWit", () => {
 });
 
 describe("formatWit - tuple", () => {
-  test("round-trips tuple", () => {
+  test("round-trips tuple with record", () => {
     const sigs = [
       "record aa { a: u32, b: u32 }",
       "f: func(x: tuple<aa, string>) -> tuple<u32, u64>;",
+    ] as const;
+
+    const parsed = parseWit(sigs);
+    const formatted = formatWit(parsed);
+    const reparsed = parseWit(formatted);
+    expect(reparsed).toEqual(parsed);
+  });
+
+  test("round-trips tuple with variant", () => {
+    const sigs = [
+      "variant vv { a(string), b(u32), c }",
+      "f: func(x: tuple<vv, u64>) -> bool;",
+    ] as const;
+
+    const result = formatWit(parseWit(sigs));
+    expect(result).toContain("variant vv { a(string), b(u32), c }");
+    expect(result).toContain("f: func(x: tuple<vv, u64>) -> bool;");
+    expect(parseWit(result)).toEqual(parseWit(sigs));
+  });
+
+  test("round-trips tuple with enum and flags", () => {
+    const sigs = [
+      "enum ee { x, y, z }",
+      "flags ff { read, write }",
+      "f: func(x: tuple<ee, ff>) -> bool;",
+    ] as const;
+
+    const result = formatWit(parseWit(sigs));
+    expect(result).toContain("enum ee { x, y, z }");
+    expect(result).toContain("flags ff { read, write }");
+    expect(parseWit(result)).toEqual(parseWit(sigs));
+  });
+
+  test("round-trips nested tuple and result containing tuple", () => {
+    const sigs = [
+      "f: func(x: tuple<tuple<u32, u32>, string>) -> result<tuple<u32, string>, error>;",
     ] as const;
 
     const parsed = parseWit(sigs);

@@ -281,6 +281,133 @@ test.each([
       ],
     },
   },
+  // Tuple with variant
+  {
+    signature: [
+      "variant vv { a(string), b(u32), c }",
+      "x: tuple<vv, u64>",
+    ],
+    expected: {
+      name: "x",
+      type: "tuple<variant, u64>",
+      internalType: "tuple<vv, u64>",
+      components: [
+        {
+          type: "variant",
+          internalType: "vv",
+          components: [
+            { name: "a", type: "string", internalType: "string" },
+            { name: "b", type: "u32", internalType: "u32" },
+            { name: "c", type: "_", internalType: "_" },
+          ],
+        },
+        { type: "u64", internalType: "u64" },
+      ],
+    },
+  },
+  // Tuple with enum and flags
+  {
+    signature: [
+      "enum ee { x, y, z }",
+      "flags ff { read, write }",
+      "x: tuple<ee, ff>",
+    ],
+    expected: {
+      name: "x",
+      type: "tuple<enum, flags>",
+      internalType: "tuple<ee, ff>",
+      components: [
+        {
+          type: "enum",
+          internalType: "ee",
+          components: [
+            { name: "x", type: "_", internalType: "_" },
+            { name: "y", type: "_", internalType: "_" },
+            { name: "z", type: "_", internalType: "_" },
+          ],
+        },
+        {
+          type: "flags",
+          internalType: "ff",
+          components: [
+            { name: "read", type: "_", internalType: "_" },
+            { name: "write", type: "_", internalType: "_" },
+          ],
+        },
+      ],
+    },
+  },
+  // Nested tuple
+  {
+    signature: "x: tuple<tuple<u32, u32>, string>",
+    expected: {
+      name: "x",
+      type: "tuple<tuple<u32, u32>, string>",
+      internalType: "tuple<tuple<u32, u32>, string>",
+      components: [
+        {
+          type: "tuple<u32, u32>",
+          internalType: "tuple<u32, u32>",
+          components: [
+            { type: "u32", internalType: "u32" },
+            { type: "u32", internalType: "u32" },
+          ],
+        },
+        { type: "string", internalType: "string" },
+      ],
+    },
+  },
+  // Tuple inside result, result inside tuple
+  {
+    signature: "x: result<tuple<u32, string>, error>",
+    expected: {
+      name: "x",
+      type: "result<tuple<u32, string>, error>",
+      internalType: "result<tuple<u32, string>, error>",
+      components: [
+        {
+          type: "tuple<u32, string>",
+          internalType: "tuple<u32, string>",
+          components: [
+            { type: "u32", internalType: "u32" },
+            { type: "string", internalType: "string" },
+          ],
+        },
+        { type: "error", internalType: "error" },
+      ],
+    },
+  },
+  // Tuple with wrapped user-defined types
+  {
+    signature: [
+      "record aa { a: u32, b: u32 }",
+      "variant vv { p(string), q }",
+      "x: tuple<list<aa>, option<vv>>",
+    ],
+    expected: {
+      name: "x",
+      type: "tuple<list<record>, option<variant>>",
+      internalType: "tuple<list<aa>, option<vv>>",
+      components: [
+        {
+          type: "list<record>",
+          internalType: "list<aa>",
+          components: [
+            { name: "a", type: "u32", internalType: "u32" },
+            { name: "b", type: "u32", internalType: "u32" },
+          ],
+        },
+        {
+          type: "option<variant>",
+          internalType: "option<vv>",
+          components: [
+            { name: "p", type: "string", internalType: "string" },
+            { name: "q", type: "_", internalType: "_" },
+          ],
+        },
+      ],
+    },
+  },
 ])("parseWitParameter($signature)", ({ signature, expected }) => {
   expect(parseWitParameter<string | string[]>(signature)).toEqual(expected);
 });

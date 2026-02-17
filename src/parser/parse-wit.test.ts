@@ -327,3 +327,50 @@ describe("parseWit - flags", () => {
     ]);
   });
 });
+
+describe("parseWit - tuple", () => {
+  test("parses function with tuple of variant and record", () => {
+    const out = parseWit([
+      "variant vv { a(string), b(u32), c }",
+      "record aa { x: u32, y: u32 }",
+      "f: func(t: tuple<vv, aa, u64>) -> bool;",
+    ]);
+
+    expect(out).toEqual([
+      {
+        name: "f",
+        type: "function",
+        inputs: [
+          {
+            name: "t",
+            type: "tuple<variant, record, u64>",
+            internalType: "tuple<vv, aa, u64>",
+            components: [
+              {
+                type: "variant",
+                internalType: "vv",
+                components: [
+                  { name: "a", type: "string", internalType: "string" },
+                  { name: "b", type: "u32", internalType: "u32" },
+                  { name: "c", type: "_", internalType: "_" },
+                ],
+              },
+              {
+                type: "record",
+                internalType: "aa",
+                components: [
+                  { name: "x", type: "u32", internalType: "u32" },
+                  { name: "y", type: "u32", internalType: "u32" },
+                ],
+              },
+              { type: "u64", internalType: "u64" },
+            ],
+          },
+        ],
+        outputs: [
+          { type: "bool", internalType: "bool" },
+        ],
+      },
+    ]);
+  });
+});

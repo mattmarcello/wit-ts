@@ -66,3 +66,32 @@ test("WitClient - flags parameter maps to record of booleans", () => {
     (p: { read: boolean; write: boolean; exec: boolean }) => Promise<boolean>
   >();
 });
+
+// Tuple primitive type mapping
+const witWithTuple = [
+  "record point { x: s32, y: s32 }",
+  "variant shape { circle(u32), rect(point) }",
+  "enum color { red, green, blue }",
+  "get-info: func(id: u64) -> tuple<shape, color, string>;",
+  "swap: func(t: tuple<u32, u64>) -> tuple<u64, u32>;",
+] as const;
+
+type TupleClient = WitClient<ParseWit<typeof witWithTuple>>;
+
+test("WitClient - tuple of variant, enum, and primitive", () => {
+  expectTypeOf<TupleClient["get-info"]>().toEqualTypeOf<
+    (id: bigint) => Promise<
+      readonly [
+        ["circle", number] | ["rect", { x: number; y: number }],
+        "red" | "green" | "blue",
+        string,
+      ]
+    >
+  >();
+});
+
+test("WitClient - tuple of primitives", () => {
+  expectTypeOf<TupleClient["swap"]>().toEqualTypeOf<
+    (t: readonly [number, bigint]) => Promise<readonly [bigint, number]>
+  >();
+});
