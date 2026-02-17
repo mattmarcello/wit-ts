@@ -39,8 +39,9 @@ function isUserDefinedType(type: string): boolean {
     type === "record" ||
     type === "variant" ||
     type === "enum" ||
-    /^(?:list|option)<(?:record|variant|enum)>$/.test(type) ||
-    /^result<(?:record|variant|enum), error>$/.test(type)
+    type === "flags" ||
+    /^(?:list|option)<(?:record|variant|enum|flags)>$/.test(type) ||
+    /^result<(?:record|variant|enum|flags), error>$/.test(type)
   );
 }
 
@@ -57,13 +58,14 @@ function formatTypeDefinition(
   const baseType =
     param.type === "record" ||
     param.type === "variant" ||
-    param.type === "enum"
+    param.type === "enum" ||
+    param.type === "flags"
       ? param.type
       : param.type.match(
-            /^(?:list|option)<(record|variant|enum)>$|^result<(record|variant|enum), error>$/,
+            /^(?:list|option)<(record|variant|enum|flags)>$|^result<(record|variant|enum|flags), error>$/,
           )?.[1] ??
         param.type.match(
-          /^(?:list|option)<(record|variant|enum)>$|^result<(record|variant|enum), error>$/,
+          /^(?:list|option)<(record|variant|enum|flags)>$|^result<(record|variant|enum|flags), error>$/,
         )?.[2];
 
   if (!baseType || !param.components) return null;
@@ -86,6 +88,10 @@ function formatTypeDefinition(
       const cases = param.components.map((c) => c.name).join(", ");
       return `enum ${name} { ${cases} }`;
     }
+    case "flags": {
+      const cases = param.components.map((c) => c.name).join(", ");
+      return `flags ${name} { ${cases} }`;
+    }
     default:
       return null;
   }
@@ -107,6 +113,7 @@ function collectFromParam(
     name === "record" ||
     name === "variant" ||
     name === "enum" ||
+    name === "flags" ||
     name === "_"
   )
     return;

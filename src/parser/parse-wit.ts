@@ -5,12 +5,14 @@ import {
   isRecordSignature,
   isVariantSignature,
   isEnumSignature,
+  isFlagsSignature,
 } from "./core/signatures.js";
 import { parseTypes } from "./core/user-defined.js";
 import { parseSignature } from "./core/utils.js";
 import type { Signatures } from "./core/types/signatures.js";
 import type {
   EnumLookup,
+  FlagsLookup,
   ParseTypes,
   RecordLookup,
   VariantLookup,
@@ -26,6 +28,7 @@ export type ParseWit<signatures extends readonly string[]> =
             records?: RecordLookup;
             variants?: VariantLookup;
             enums?: EnumLookup;
+            flags?: FlagsLookup;
           }
           ? {
               [key in keyof signatures]: signatures[key] extends string
@@ -57,8 +60,15 @@ export function parseWit<const signatures extends readonly string[]>(
     if (isRecordSignature(signature)) continue;
     if (isVariantSignature(signature)) continue;
     if (isEnumSignature(signature)) continue;
+    if (isFlagsSignature(signature)) continue;
     wit.push(
-      parseSignature(signature, types.records, types.variants, types.enums),
+      parseSignature(
+        signature,
+        types.records,
+        types.variants,
+        types.enums,
+        types.flags,
+      ),
     );
   }
   return wit as unknown as ParseWit<signatures>;

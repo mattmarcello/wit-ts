@@ -4,6 +4,7 @@ import type {
   ParseRecords,
   ParseVariants,
   ParseEnums,
+  ParseFlags,
 } from "./user-defined.js";
 
 // ============================================================================
@@ -181,6 +182,7 @@ test("ParseTypes - record referencing variant", () => {
       ];
     };
     enums: {};
+    flags: {};
   }>();
 });
 
@@ -216,6 +218,7 @@ test("ParseTypes - record referencing enum", () => {
       ];
     };
     enums: { ee: readonly ["x", "y", "z"] };
+    flags: {};
   }>();
 });
 
@@ -242,6 +245,7 @@ test("ParseTypes - variant referencing enum", () => {
       ];
     };
     enums: { ee: readonly ["x", "y", "z"] };
+    flags: {};
   }>();
 });
 
@@ -256,6 +260,7 @@ test("ParseTypes - variant with nested record", () => {
     >
   >().toEqualTypeOf<{
     enums: {};
+    flags: {};
     records: {
       aa: readonly [
         { readonly name: "a"; readonly type: "u8"; readonly internalType: "u8" },
@@ -354,6 +359,7 @@ test("ParseTypes - enum wrapped in generics", () => {
       ];
     };
     enums: { ee: readonly ["x", "y", "z"] };
+    flags: {};
   }>();
 });
 
@@ -372,6 +378,7 @@ test("ParseTypes - all three types together", () => {
     >
   >().toEqualTypeOf<{
     enums: { ee: readonly ["x", "y", "z"] };
+    flags: {};
     records: {
       aa: readonly [
         { readonly name: "a"; readonly type: "string"; readonly internalType: "string" },
@@ -425,6 +432,7 @@ test("ParseTypes - deeply nested types", () => {
     >
   >().toEqualTypeOf<{
     enums: { ee: readonly ["x", "y", "z"] };
+    flags: {};
     records: {
       aa: readonly [
         { readonly name: "a"; readonly type: "u32"; readonly internalType: "u32" },
@@ -515,6 +523,7 @@ test("ParseTypes - detects circular record reference", () => {
     };
     variants: {};
     enums: ParseEnums<["record aa { b: bb }", "record bb { a: aa }"]>;
+    flags: {};
   }>();
 });
 
@@ -560,6 +569,7 @@ test("ParseTypes - detects circular variant reference", () => {
       ];
     };
     enums: {};
+    flags: {};
   }>();
 });
 
@@ -645,6 +655,7 @@ test("ParseTypes - detects circular reference with enum in the chain", () => {
       ];
     };
     enums: { ee: readonly ["x", "y"] };
+    flags: {};
     variants: {};
   }>();
 });
@@ -729,6 +740,7 @@ test("ParseTypes - detects multi-level circular reference", () => {
     };
     variants: {};
     enums: {};
+    flags: {};
   }>();
 });
 
@@ -799,6 +811,7 @@ test("ParseTypes - records in variants are recursively expanded", () => {
     >
   >().toEqualTypeOf<{
     enums: {};
+    flags: {};
     records: {
       aa: readonly [
         { readonly name: "a"; readonly type: "u8"; readonly internalType: "u8" },
@@ -861,6 +874,62 @@ test("ParseTypes - records in variants are recursively expanded", () => {
           ];
         },
       ];
+    };
+  }>();
+});
+
+// ============================================================================
+// Flags Tests
+// ============================================================================
+
+test("ParseFlags - simple", () => {
+  expectTypeOf<
+    ParseFlags<["flags permissions { read, write, exec }"]>
+  >().toEqualTypeOf<{
+    permissions: readonly ["read", "write", "exec"];
+  }>();
+});
+
+test("ParseFlags - multiple", () => {
+  expectTypeOf<
+    ParseFlags<[
+      "flags permissions { read, write }",
+      "flags mode { binary, text }",
+    ]>
+  >().toEqualTypeOf<{
+    permissions: readonly ["read", "write"];
+    mode: readonly ["binary", "text"];
+  }>();
+});
+
+test("ParseTypes - record referencing flags", () => {
+  expectTypeOf<
+    ParseTypes<
+      [
+        "flags permissions { read, write, exec }",
+        "record file { name: string, perms: permissions }",
+      ]
+    >
+  >().toEqualTypeOf<{
+    records: {
+      file: readonly [
+        { readonly name: "name"; readonly type: "string"; readonly internalType: "string" },
+        {
+          readonly name: "perms";
+          readonly type: "flags";
+          readonly internalType: "permissions";
+          readonly components: readonly [
+            { readonly name: "read"; readonly type: "_" },
+            { readonly name: "write"; readonly type: "_" },
+            { readonly name: "exec"; readonly type: "_" },
+          ];
+        },
+      ];
+    };
+    variants: {};
+    enums: {};
+    flags: {
+      permissions: readonly ["read", "write", "exec"];
     };
   }>();
 });

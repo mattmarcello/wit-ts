@@ -5,6 +5,7 @@ export type MBits = 8 | 16 | 32 | 64;
 export type WitRecord = "record";
 export type WitVariant = "variant";
 export type WitEnum = "enum";
+export type WitFlag = "flags";
 export type WitError = "error";
 export type WitUnit = "_";
 
@@ -30,6 +31,8 @@ export type WitOptionWithVariant = _BuildOptionTypes<WitVariant>;
 
 export type WitOptionWithEnum = _BuildOptionTypes<WitEnum>;
 
+export type WitOptionWithFlags = _BuildOptionTypes<WitFlag>;
+
 export type WitOptionWithList = _BuildOptionTypes<WitList>;
 
 export type WitOption =
@@ -37,6 +40,7 @@ export type WitOption =
   | WitOptionWithRecord
   | WitOptionWithVariant
   | WitOptionWithEnum
+  | WitOptionWithFlags
   | WitOptionWithList;
 
 type _BuildResultTypes<T extends string> = `result<${T}, error>`;
@@ -52,6 +56,7 @@ export type WitResultWithoutRecord = _BuildResultTypes<
 export type WitResultWithRecord = _BuildResultTypes<WitRecord>;
 export type WitResultWithVariant = _BuildResultTypes<WitVariant>;
 export type WitResultWithEnum = _BuildResultTypes<WitEnum>;
+export type WitResultWithFlags = _BuildResultTypes<WitFlag>;
 
 export type WitResultWithList = _BuildResultTypes<WitList>;
 
@@ -59,6 +64,7 @@ export type WitResult =
   | WitResultWithoutRecord
   | WitResultWithRecord
   | WitResultWithEnum
+  | WitResultWithFlags
   | WitResultWithVariant
   | WitResultWithList;
 
@@ -77,10 +83,13 @@ export type WitListWithVariant = _BuildListTypes<WitVariant>;
 
 export type WitListWithEnum = _BuildListTypes<WitEnum>;
 
+export type WitListWithFlags = _BuildListTypes<WitFlag>;
+
 export type WitList = Exclude<
   | WitListWithoutRecord
   | WitListWithRecord
   | WitListWithEnum
+  | WitListWithFlags
   | WitListWithVariant,
   _BuildListTypes<WitUnit>
 >;
@@ -98,6 +107,7 @@ export type WitType =
   | WitList
   | WitVariant
   | WitEnum
+  | WitFlag
   | WitOption;
 
 type ResolvedWitType = ResolvedRegister["strictWitType"] extends true

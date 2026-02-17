@@ -1,6 +1,11 @@
 import { expect, test, describe } from "vitest";
 
-import { execFunctionSignature, isFunctionSignature } from "./signatures.js";
+import {
+  execFunctionSignature,
+  isFunctionSignature,
+  isFlagsSignature,
+  execFlagsSignature,
+} from "./signatures.js";
 
 describe("isFunctionSignature", () => {
   test.each([
@@ -68,5 +73,31 @@ describe("execFunctionSignature", () => {
     },
   ])("%s", ({ input, expected }) => {
     expect(execFunctionSignature(input)).toStrictEqual(expected);
+  });
+});
+
+describe("isFlagsSignature", () => {
+  test.each([
+    "flags permissions { read, write, exec }",
+    "flags empty-set { a }",
+    "flags kebab-case { one-flag, two-flag }",
+  ])("%s -> true", (input) => {
+    expect(isFlagsSignature(input)).toBe(true);
+  });
+
+  test.each([
+    "enum status { active, done }",
+    "record point { x: u32 }",
+    "f: func() -> u64;",
+  ])("%s -> false", (input) => {
+    expect(isFlagsSignature(input)).toBe(false);
+  });
+});
+
+describe("execFlagsSignature", () => {
+  test("parses flags with cases", () => {
+    const result = execFlagsSignature("flags permissions { read, write, exec }");
+    expect(result).toHaveProperty("name", "permissions");
+    expect(result!.cases.trim()).toBe("read, write, exec");
   });
 });

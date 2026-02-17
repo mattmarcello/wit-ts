@@ -3,6 +3,7 @@ import type { IsFunctionSignature } from "./signatures.js";
 import type { Error_ } from "../../../error.js";
 import type {
   EnumLookup,
+  FlagsLookup,
   RecordLookup,
   VariantLookup,
   EnumToComponents,
@@ -12,6 +13,7 @@ type ParseOptions = {
   records?: RecordLookup | unknown;
   variants?: VariantLookup | unknown;
   enums?: EnumLookup | unknown;
+  flags?: FlagsLookup | unknown;
 };
 type DefaultParseOptions = {};
 
@@ -28,6 +30,10 @@ type HasEnums<Opts> = Opts extends { enums: Record<string, unknown> }
   ? true
   : false;
 
+type HasFlags<Opts> = Opts extends { flags: Record<string, unknown> }
+  ? true
+  : false;
+
 type RecordsOf<Opts> = Opts extends { records: infer R extends RecordLookup }
   ? R
   : never;
@@ -38,6 +44,10 @@ type VariantsOf<Opts> = Opts extends { variants: infer R extends VariantLookup }
 
 type EnumsOf<Opts> = Opts extends { enums: infer E extends EnumLookup }
   ? E
+  : never;
+
+type FlagsOf<Opts> = Opts extends { flags: infer F extends FlagsLookup }
+  ? F
   : never;
 
 type WithName<Shallow> = Shallow extends { name: infer N extends string }
@@ -69,6 +79,19 @@ type MapCaseFields<
       >
     : never;
 };
+type AsUserDefinedFallback<
+  T extends string,
+  Opts extends ParseOptions,
+> = HasFlags<Opts> extends true
+  ? T extends keyof FlagsOf<Opts>
+    ? Readonlyify<{
+        type: "flags";
+        internalType: T;
+        components: EnumToComponents<FlagsOf<Opts>[T]>;
+      }>
+    : Readonlyify<{ type: T; internalType: T }>
+  : Readonlyify<{ type: T; internalType: T }>;
+
 type AsUserDefinedType<
   T extends string,
   Opts extends ParseOptions,
@@ -100,8 +123,8 @@ type AsUserDefinedType<
                   internalType: T;
                   components: EnumToComponents<EnumsOf<Opts>[T]>;
                 }>
-              : Readonlyify<{ type: T; internalType: T }>
-            : Readonlyify<{ type: T; internalType: T }>
+              : AsUserDefinedFallback<T, Opts>
+            : AsUserDefinedFallback<T, Opts>
         : HasEnums<Opts> extends true
           ? T extends keyof EnumsOf<Opts>
             ? Readonlyify<{
@@ -109,8 +132,8 @@ type AsUserDefinedType<
                 internalType: T;
                 components: EnumToComponents<EnumsOf<Opts>[T]>;
               }>
-            : Readonlyify<{ type: T; internalType: T }>
-          : Readonlyify<{ type: T; internalType: T }>
+            : AsUserDefinedFallback<T, Opts>
+          : AsUserDefinedFallback<T, Opts>
     : HasVariants<Opts> extends true
       ? T extends keyof VariantsOf<Opts>
         ? Readonlyify<{
@@ -125,8 +148,8 @@ type AsUserDefinedType<
                 internalType: T;
                 components: EnumToComponents<EnumsOf<Opts>[T]>;
               }>
-            : Readonlyify<{ type: T; internalType: T }>
-          : Readonlyify<{ type: T; internalType: T }>
+            : AsUserDefinedFallback<T, Opts>
+          : AsUserDefinedFallback<T, Opts>
       : HasEnums<Opts> extends true
         ? T extends keyof EnumsOf<Opts>
           ? Readonlyify<{
@@ -134,8 +157,8 @@ type AsUserDefinedType<
               internalType: T;
               components: EnumToComponents<EnumsOf<Opts>[T]>;
             }>
-          : Readonlyify<{ type: T; internalType: T }>
-        : Readonlyify<{ type: T; internalType: T }>;
+          : AsUserDefinedFallback<T, Opts>
+        : AsUserDefinedFallback<T, Opts>;
 
 type SplitResultInner<S extends string> = S extends `${infer L}, ${infer R}`
   ? [Trim<L>, Trim<R>]
@@ -264,6 +287,7 @@ export type ParseSignature<
     records?: RecordLookup | unknown;
     variants?: VariantLookup | unknown;
     enums?: EnumLookup | unknown;
+    flags?: FlagsLookup | unknown;
   } = {},
 > =
   IsFunctionSignature<signature> extends true

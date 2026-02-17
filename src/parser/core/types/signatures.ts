@@ -4,7 +4,8 @@ export type IsSignature<type extends string> =
   | (IsFunctionSignature<type> extends true ? true : never)
   | (IsRecordSignature<type> extends true ? true : never)
   | (IsVariantSignature<type> extends true ? true : never)
-  | (IsEnumSignature<type> extends true ? true : never);
+  | (IsEnumSignature<type> extends true ? true : never)
+  | (IsFlagsSignature<type> extends true ? true : never);
 
 export type Signature<
   string1 extends string,
@@ -45,6 +46,14 @@ export type EnumSignature<
 
 export type IsEnumSignature<signature extends string> =
   signature extends EnumSignature<infer name> ? IsName<name> : false;
+
+export type FlagsSignature<
+  name extends string = string,
+  cases extends string = string,
+> = `flags ${name} { ${cases} }`;
+
+export type IsFlagsSignature<signature extends string> =
+  signature extends FlagsSignature<infer name> ? IsName<name> : false;
 
 export type FunctionSignature<
   name extends string = string,

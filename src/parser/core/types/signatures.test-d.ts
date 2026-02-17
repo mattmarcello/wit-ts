@@ -5,6 +5,7 @@ import type {
   IsRecordSignature,
   IsEnumSignature,
   IsVariantSignature,
+  IsFlagsSignature,
   IsSignature,
 } from "./signatures.js";
 
@@ -31,6 +32,11 @@ test("IsVariantSignature", () => {
   assertType<IsVariantSignature<"variant vv { a, b, c(list<string>) }">>(true);
 });
 
+test("IsFlagsSignature", () => {
+  assertType<IsFlagsSignature<"flags permissions { read, write, exec }">>(true);
+  assertType<IsFlagsSignature<"enum ee { x, y }">>(false);
+});
+
 test("IsSignature", () => {
   assertType<IsSignature<"record aa { a: string, b: s64 }">>(true);
   assertType<IsSignature<"record bb { a: string, b: string }">>(true);
@@ -39,4 +45,5 @@ test("IsSignature", () => {
   assertType<IsSignature<"h: func() -> list<u64>;">>(true);
   assertType<IsSignature<"enum ee { x, y, z }">>(true);
   assertType<IsSignature<"variant vv { a, b, c(list<string>) }">>(true);
+  assertType<IsSignature<"flags permissions { read, write, exec }">>(true);
 });

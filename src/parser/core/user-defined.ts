@@ -7,18 +7,21 @@ import {
   execRecordSignature,
   execVariantSignature,
   execEnumSignature,
+  execFlagsSignature,
   isRecordSignature,
   isVariantSignature,
   isEnumSignature,
+  isFlagsSignature,
 } from "./signatures.js";
 import { parseWitParameter, splitParameters } from "./utils.js";
 import type {
   EnumLookup,
+  FlagsLookup,
   RecordLookup,
   VariantLookup,
 } from "./types/user-defined.js";
 
-type TypeKind = "record" | "variant" | "enum";
+type TypeKind = "record" | "variant" | "enum" | "flags";
 
 type TypeSignatureHandler = {
   kind: TypeKind;
@@ -126,12 +129,43 @@ const typeHandlers: TypeSignatureHandler[] = [
       }
     },
   },
+  {
+    kind: "flags",
+    isSignature: isFlagsSignature,
+    execSignature: execFlagsSignature,
+    parseComponents: (match) => {
+      const cases = match.cases.split(",");
+      const components: string[] = [];
+
+      for (let k = 0; k < cases.length; k++) {
+        const caseItem = cases[k]!;
+        const trimmed = caseItem.trim();
+        if (!trimmed) continue;
+
+        if (!/^[A-Za-z$_][A-Za-z0-9$_-]*$/.test(trimmed)) {
+          throw new Error(
+            `Invalid flags case: ${trimmed}. Flags cannot have payloads.`,
+          );
+        }
+
+        components.push(trimmed);
+      }
+
+      return components;
+    },
+    validateComponents: (components, signature) => {
+      if (!components.length) {
+        throw new InvalidSignatureError({ signature, type: "flags" });
+      }
+    },
+  },
 ];
 
 export function parseTypes(signatures: readonly string[]) {
   const shallowRecords: RecordLookup = {};
   const shallowVariants: VariantLookup = {};
   const shallowEnums: EnumLookup = {};
+  const shallowFlags: FlagsLookup = {};
   const signaturesLength = signatures.length;
 
   // First pass: parse all signatures into shallow structures
@@ -160,6 +194,9 @@ export function parseTypes(signatures: readonly string[]) {
         case "enum":
           shallowEnums[match.name] = components as string[];
           break;
+        case "flags":
+          shallowFlags[match.name] = components as string[];
+          break;
       }
 
       break; // Found matching handler, no need to check others
@@ -167,7 +204,7 @@ export function parseTypes(signatures: readonly string[]) {
   }
 
   // Check for namespace collisions
-  assertNoCollisions(shallowRecords, shallowVariants, shallowEnums);
+  assertNoCollisions(shallowRecords, shallowVariants, shallowEnums, shallowFlags);
 
   // Second pass: resolve all references
   const resolvedRecords: RecordLookup = {};
@@ -179,6 +216,7 @@ export function parseTypes(signatures: readonly string[]) {
       shallowRecords,
       shallowVariants,
       shallowEnums,
+      shallowFlags,
       new Set<string>(),
     );
   }
@@ -192,17 +230,20 @@ export function parseTypes(signatures: readonly string[]) {
       shallowRecords,
       shallowVariants,
       shallowEnums,
+      shallowFlags,
       new Set<string>(),
     );
   }
 
-  // Enums don't need resolution as they have no type references
+  // Enums and flags don't need resolution as they have no type references
   const resolvedEnums: EnumLookup = { ...shallowEnums };
+  const resolvedFlags: FlagsLookup = { ...shallowFlags };
 
   return {
     records: resolvedRecords,
     variants: resolvedVariants,
     enums: resolvedEnums,
+    flags: resolvedFlags,
   };
 }
 
@@ -261,11 +302,13 @@ function assertNoCollisions(
   records: RecordLookup,
   variants: VariantLookup,
   enums: EnumLookup,
+  flags: FlagsLookup,
 ) {
   const allTypes = [
     ...Object.keys(records).map((k) => ({ name: k, kind: "record" })),
     ...Object.keys(variants).map((k) => ({ name: k, kind: "variant" })),
     ...Object.keys(enums).map((k) => ({ name: k, kind: "enum" })),
+    ...Object.keys(flags).map((k) => ({ name: k, kind: "flags" })),
   ];
 
   const seen = new Map<string, string>();
@@ -286,6 +329,7 @@ function resolveTypes(
   records: RecordLookup,
   variants: VariantLookup,
   enums: EnumLookup,
+  flags: FlagsLookup,
   ancestors = new Set<string>(),
 ) {
   const components: WitParameter[] = [];
@@ -314,6 +358,7 @@ function resolveTypes(
           records,
           variants,
           enums,
+          flags,
           new Set([...ancestors, base]),
         ),
       });
@@ -343,6 +388,7 @@ function resolveTypes(
           records,
           variants,
           enums,
+          flags,
           new Set([...ancestors, base]),
         ),
       });
@@ -374,6 +420,34 @@ function resolveTypes(
             : `${m.wrapper}<${base}>`
           : base,
         components: enumCases as WitParameter[],
+      });
+      continue;
+    }
+
+    // Check if it's a named flags
+    if (base in flags) {
+      if (ancestors.has(base)) {
+        throw new Error(`Circular reference detected at "${base}".`);
+      }
+
+      const flagsCases = flags[base]!.map((caseName) => ({
+        name: caseName,
+        type: "_",
+      }));
+
+      components.push({
+        ...witParameter,
+        type: m.wrapper
+          ? m.wrapper === "result"
+            ? `result<flags, error>`
+            : `${m.wrapper}<flags>`
+          : "flags",
+        internalType: m.wrapper
+          ? m.wrapper === "result"
+            ? `result<${base}, error>`
+            : `${m.wrapper}<${base}>`
+          : base,
+        components: flagsCases as WitParameter[],
       });
       continue;
     }

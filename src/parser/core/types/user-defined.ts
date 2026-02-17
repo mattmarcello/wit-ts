@@ -4,6 +4,7 @@ import type {
   RecordSignature,
   VariantSignature,
   EnumSignature,
+  FlagsSignature,
 } from "./signatures.js";
 import type { ParseWitParameter, SplitParameters } from "./utils.js";
 import type { Error_ } from "../../../error.js";
@@ -15,6 +16,7 @@ export type ComponentLookup = Record<
 export type RecordLookup = ComponentLookup;
 export type VariantLookup = ComponentLookup;
 export type EnumLookup = Record<string, readonly string[]>;
+export type FlagsLookup = Record<string, readonly string[]>;
 // Enum Types
 // ============================================================================
 
@@ -39,6 +41,35 @@ export type ParseEnumCases<
 > =
   Trim<signature> extends `${infer head},${infer tail}`
     ? ParseEnumCases<tail, readonly [...result, Trim<head>]>
+    : Trim<signature> extends ""
+      ? result
+      : readonly [...result, Trim<signature>];
+
+// ============================================================================
+// Flags Types
+// ============================================================================
+
+export type ParseFlags<signatures extends readonly string[]> = {
+  [signature in signatures[number] as ParseFlag<signature> extends infer flag_ extends
+    { name: string }
+    ? flag_["name"]
+    : never]: ParseFlag<signature>["cases"];
+};
+
+type ParseFlag<signature extends string> =
+  signature extends FlagsSignature<infer name, infer cases>
+    ? {
+        readonly name: Trim<name>;
+        readonly cases: ParseFlagsCases<cases>;
+      }
+    : never;
+
+type ParseFlagsCases<
+  signature extends string,
+  result extends readonly string[] = [],
+> =
+  Trim<signature> extends `${infer head},${infer tail}`
+    ? ParseFlagsCases<tail, readonly [...result, Trim<head>]>
     : Trim<signature> extends ""
       ? result
       : readonly [...result, Trim<signature>];
@@ -161,6 +192,7 @@ export type ResolveTypes<
   records extends ComponentLookup | unknown = unknown,
   variants extends ComponentLookup | unknown = unknown,
   enums extends EnumLookup | unknown = unknown,
+  flags extends FlagsLookup | unknown = unknown,
   keyReferences extends { [_: string]: unknown } | unknown = unknown,
 > = readonly [
   ...{
@@ -173,6 +205,7 @@ export type ResolveTypes<
           records,
           variants,
           enums,
+          flags,
           keyReferences
         >
       : witParameters[key]["type"] extends `option<${infer inner}>`
@@ -183,6 +216,7 @@ export type ResolveTypes<
             records,
             variants,
             enums,
+            flags,
             keyReferences
           >
         : witParameters[key]["type"] extends `borrow<${infer inner}>`
@@ -193,6 +227,7 @@ export type ResolveTypes<
               records,
               variants,
               enums,
+              flags,
               keyReferences
             >
           : witParameters[key]["type"] extends `result<${infer inner}, error>`
@@ -203,6 +238,7 @@ export type ResolveTypes<
                 records,
                 variants,
                 enums,
+                flags,
                 keyReferences
               >
             : // Handle direct type references
@@ -211,6 +247,7 @@ export type ResolveTypes<
                 records,
                 variants,
                 enums,
+                flags,
                 keyReferences
               >;
   },
@@ -223,6 +260,7 @@ type ResolveWrappedType<
   records extends ComponentLookup | unknown,
   variants extends ComponentLookup | unknown,
   enums extends EnumLookup | unknown,
+  flags extends FlagsLookup | unknown,
   keyReferences extends { [_: string]: unknown } | unknown,
 > =
   // Check if inner type is a record
@@ -243,6 +281,7 @@ type ResolveWrappedType<
               records,
               variants,
               enums,
+              flags,
               keyReferences & { [K in inner]: true }
             >;
           }
@@ -263,6 +302,7 @@ type ResolveWrappedType<
                   records,
                   variants,
                   enums,
+                  flags,
                   keyReferences & { [K in inner]: true }
                 >;
               }
@@ -280,16 +320,204 @@ type ResolveWrappedType<
                       : `${wrapper}<${inner}>`;
                     readonly components: EnumToComponents<enums[inner]>;
                   }
+              : [flags] extends [FlagsLookup]
+                ? inner extends keyof flags
+                  ? inner extends keyof keyReferences
+                    ? Error_<`Circular reference detected at "${inner}".`>
+                    : {
+                        readonly name: param["name"];
+                        readonly type: wrapper extends "result"
+                          ? `result<flags, error>`
+                          : `${wrapper}<flags>`;
+                        readonly internalType: wrapper extends "result"
+                          ? `result<${inner}, error>`
+                          : `${wrapper}<${inner}>`;
+                        readonly components: EnumToComponents<flags[inner]>;
+                      }
+                  : param
+                : param
+            : [flags] extends [FlagsLookup]
+              ? inner extends keyof flags
+                ? inner extends keyof keyReferences
+                  ? Error_<`Circular reference detected at "${inner}".`>
+                  : {
+                      readonly name: param["name"];
+                      readonly type: wrapper extends "result"
+                        ? `result<flags, error>`
+                        : `${wrapper}<flags>`;
+                      readonly internalType: wrapper extends "result"
+                        ? `result<${inner}, error>`
+                        : `${wrapper}<${inner}>`;
+                      readonly components: EnumToComponents<flags[inner]>;
+                    }
+                : param
+              : param
+        : [enums] extends [EnumLookup]
+          ? inner extends keyof enums
+            ? inner extends keyof keyReferences
+              ? Error_<`Circular reference detected at "${inner}".`>
+              : {
+                  readonly name: param["name"];
+                  readonly type: wrapper extends "result"
+                    ? `result<enum, error>`
+                    : `${wrapper}<enum>`;
+                  readonly internalType: wrapper extends "result"
+                    ? `result<${inner}, error>`
+                    : `${wrapper}<${inner}>`;
+                  readonly components: EnumToComponents<enums[inner]>;
+                }
+            : [flags] extends [FlagsLookup]
+              ? inner extends keyof flags
+                ? inner extends keyof keyReferences
+                  ? Error_<`Circular reference detected at "${inner}".`>
+                  : {
+                      readonly name: param["name"];
+                      readonly type: wrapper extends "result"
+                        ? `result<flags, error>`
+                        : `${wrapper}<flags>`;
+                      readonly internalType: wrapper extends "result"
+                        ? `result<${inner}, error>`
+                        : `${wrapper}<${inner}>`;
+                      readonly components: EnumToComponents<flags[inner]>;
+                    }
+                : param
+              : param
+          : [flags] extends [FlagsLookup]
+            ? inner extends keyof flags
+              ? inner extends keyof keyReferences
+                ? Error_<`Circular reference detected at "${inner}".`>
+                : {
+                    readonly name: param["name"];
+                    readonly type: wrapper extends "result"
+                      ? `result<flags, error>`
+                      : `${wrapper}<flags>`;
+                    readonly internalType: wrapper extends "result"
+                      ? `result<${inner}, error>`
+                      : `${wrapper}<${inner}>`;
+                    readonly components: EnumToComponents<flags[inner]>;
+                  }
               : param
             : param
-        : param
-    : param;
+    : [variants] extends [ComponentLookup]
+      ? inner extends keyof variants
+        ? inner extends keyof keyReferences
+          ? Error_<`Circular reference detected at "${inner}".`>
+          : {
+              readonly name: param["name"];
+              readonly type: wrapper extends "result"
+                ? `result<variant, error>`
+                : `${wrapper}<variant>`;
+              readonly internalType: wrapper extends "result"
+                ? `result<${inner}, error>`
+                : `${wrapper}<${inner}>`;
+              readonly components: ResolveTypes<
+                variants[inner],
+                records,
+                variants,
+                enums,
+                flags,
+                keyReferences & { [K in inner]: true }
+              >;
+            }
+        : [enums] extends [EnumLookup]
+          ? inner extends keyof enums
+            ? inner extends keyof keyReferences
+              ? Error_<`Circular reference detected at "${inner}".`>
+              : {
+                  readonly name: param["name"];
+                  readonly type: wrapper extends "result"
+                    ? `result<enum, error>`
+                    : `${wrapper}<enum>`;
+                  readonly internalType: wrapper extends "result"
+                    ? `result<${inner}, error>`
+                    : `${wrapper}<${inner}>`;
+                  readonly components: EnumToComponents<enums[inner]>;
+                }
+            : [flags] extends [FlagsLookup]
+              ? inner extends keyof flags
+                ? inner extends keyof keyReferences
+                  ? Error_<`Circular reference detected at "${inner}".`>
+                  : {
+                      readonly name: param["name"];
+                      readonly type: wrapper extends "result"
+                        ? `result<flags, error>`
+                        : `${wrapper}<flags>`;
+                      readonly internalType: wrapper extends "result"
+                        ? `result<${inner}, error>`
+                        : `${wrapper}<${inner}>`;
+                      readonly components: EnumToComponents<flags[inner]>;
+                    }
+                : param
+              : param
+          : [flags] extends [FlagsLookup]
+            ? inner extends keyof flags
+              ? inner extends keyof keyReferences
+                ? Error_<`Circular reference detected at "${inner}".`>
+                : {
+                    readonly name: param["name"];
+                    readonly type: wrapper extends "result"
+                      ? `result<flags, error>`
+                      : `${wrapper}<flags>`;
+                    readonly internalType: wrapper extends "result"
+                      ? `result<${inner}, error>`
+                      : `${wrapper}<${inner}>`;
+                    readonly components: EnumToComponents<flags[inner]>;
+                  }
+              : param
+            : param
+      : [enums] extends [EnumLookup]
+        ? inner extends keyof enums
+          ? inner extends keyof keyReferences
+            ? Error_<`Circular reference detected at "${inner}".`>
+            : {
+                readonly name: param["name"];
+                readonly type: wrapper extends "result"
+                  ? `result<enum, error>`
+                  : `${wrapper}<enum>`;
+                readonly internalType: wrapper extends "result"
+                  ? `result<${inner}, error>`
+                  : `${wrapper}<${inner}>`;
+                readonly components: EnumToComponents<enums[inner]>;
+              }
+          : [flags] extends [FlagsLookup]
+            ? inner extends keyof flags
+              ? inner extends keyof keyReferences
+                ? Error_<`Circular reference detected at "${inner}".`>
+                : {
+                    readonly name: param["name"];
+                    readonly type: wrapper extends "result"
+                      ? `result<flags, error>`
+                      : `${wrapper}<flags>`;
+                    readonly internalType: wrapper extends "result"
+                      ? `result<${inner}, error>`
+                      : `${wrapper}<${inner}>`;
+                    readonly components: EnumToComponents<flags[inner]>;
+                  }
+              : param
+            : param
+        : [flags] extends [FlagsLookup]
+          ? inner extends keyof flags
+            ? inner extends keyof keyReferences
+              ? Error_<`Circular reference detected at "${inner}".`>
+              : {
+                  readonly name: param["name"];
+                  readonly type: wrapper extends "result"
+                    ? `result<flags, error>`
+                    : `${wrapper}<flags>`;
+                  readonly internalType: wrapper extends "result"
+                    ? `result<${inner}, error>`
+                    : `${wrapper}<${inner}>`;
+                  readonly components: EnumToComponents<flags[inner]>;
+                }
+            : param
+          : param;
 
 type ResolveDirectType<
   param extends WitParameter & { type: string },
   records extends ComponentLookup | unknown,
   variants extends ComponentLookup | unknown,
   enums extends EnumLookup | unknown,
+  flags extends FlagsLookup | unknown,
   keyReferences extends { [_: string]: unknown } | unknown,
 > =
   // Check if it's a record
@@ -306,6 +534,7 @@ type ResolveDirectType<
               records,
               variants,
               enums,
+              flags,
               keyReferences & { [K in param["type"]]: true }
             >;
           }
@@ -322,6 +551,7 @@ type ResolveDirectType<
                   records,
                   variants,
                   enums,
+                  flags,
                   keyReferences & { [K in param["type"]]: true }
                 >;
               }
@@ -335,10 +565,149 @@ type ResolveDirectType<
                     readonly internalType: param["type"];
                     readonly components: EnumToComponents<enums[param["type"]]>;
                   }
+              : [flags] extends [FlagsLookup]
+                ? param["type"] extends keyof flags
+                  ? param["type"] extends keyof keyReferences
+                    ? Error_<`Circular reference detected at "${param["type"]}".`>
+                    : {
+                        readonly name: param["name"];
+                        readonly type: "flags";
+                        readonly internalType: param["type"];
+                        readonly components: EnumToComponents<flags[param["type"]]>;
+                      }
+                  : param
+                : param
+            : [flags] extends [FlagsLookup]
+              ? param["type"] extends keyof flags
+                ? param["type"] extends keyof keyReferences
+                  ? Error_<`Circular reference detected at "${param["type"]}".`>
+                  : {
+                      readonly name: param["name"];
+                      readonly type: "flags";
+                      readonly internalType: param["type"];
+                      readonly components: EnumToComponents<flags[param["type"]]>;
+                    }
+                : param
+              : param
+        : [enums] extends [EnumLookup]
+          ? param["type"] extends keyof enums
+            ? param["type"] extends keyof keyReferences
+              ? Error_<`Circular reference detected at "${param["type"]}".`>
+              : {
+                  readonly name: param["name"];
+                  readonly type: "enum";
+                  readonly internalType: param["type"];
+                  readonly components: EnumToComponents<enums[param["type"]]>;
+                }
+            : [flags] extends [FlagsLookup]
+              ? param["type"] extends keyof flags
+                ? param["type"] extends keyof keyReferences
+                  ? Error_<`Circular reference detected at "${param["type"]}".`>
+                  : {
+                      readonly name: param["name"];
+                      readonly type: "flags";
+                      readonly internalType: param["type"];
+                      readonly components: EnumToComponents<flags[param["type"]]>;
+                    }
+                : param
+              : param
+          : [flags] extends [FlagsLookup]
+            ? param["type"] extends keyof flags
+              ? param["type"] extends keyof keyReferences
+                ? Error_<`Circular reference detected at "${param["type"]}".`>
+                : {
+                    readonly name: param["name"];
+                    readonly type: "flags";
+                    readonly internalType: param["type"];
+                    readonly components: EnumToComponents<flags[param["type"]]>;
+                  }
               : param
             : param
-        : param
-    : param;
+    : [variants] extends [ComponentLookup]
+      ? param["type"] extends keyof variants
+        ? param["type"] extends keyof keyReferences
+          ? Error_<`Circular reference detected at "${param["type"]}".`>
+          : {
+              readonly name: param["name"];
+              readonly type: "variant";
+              readonly internalType: param["type"];
+              readonly components: ResolveTypes<
+                variants[param["type"]],
+                records,
+                variants,
+                enums,
+                flags,
+                keyReferences & { [K in param["type"]]: true }
+              >;
+            }
+        : [enums] extends [EnumLookup]
+          ? param["type"] extends keyof enums
+            ? param["type"] extends keyof keyReferences
+              ? Error_<`Circular reference detected at "${param["type"]}".`>
+              : {
+                  readonly name: param["name"];
+                  readonly type: "enum";
+                  readonly internalType: param["type"];
+                  readonly components: EnumToComponents<enums[param["type"]]>;
+                }
+            : [flags] extends [FlagsLookup]
+              ? param["type"] extends keyof flags
+                ? param["type"] extends keyof keyReferences
+                  ? Error_<`Circular reference detected at "${param["type"]}".`>
+                  : {
+                      readonly name: param["name"];
+                      readonly type: "flags";
+                      readonly internalType: param["type"];
+                      readonly components: EnumToComponents<flags[param["type"]]>;
+                    }
+                : param
+              : param
+          : [flags] extends [FlagsLookup]
+            ? param["type"] extends keyof flags
+              ? param["type"] extends keyof keyReferences
+                ? Error_<`Circular reference detected at "${param["type"]}".`>
+                : {
+                    readonly name: param["name"];
+                    readonly type: "flags";
+                    readonly internalType: param["type"];
+                    readonly components: EnumToComponents<flags[param["type"]]>;
+                  }
+              : param
+            : param
+      : [enums] extends [EnumLookup]
+        ? param["type"] extends keyof enums
+          ? param["type"] extends keyof keyReferences
+            ? Error_<`Circular reference detected at "${param["type"]}".`>
+            : {
+                readonly name: param["name"];
+                readonly type: "enum";
+                readonly internalType: param["type"];
+                readonly components: EnumToComponents<enums[param["type"]]>;
+              }
+          : [flags] extends [FlagsLookup]
+            ? param["type"] extends keyof flags
+              ? param["type"] extends keyof keyReferences
+                ? Error_<`Circular reference detected at "${param["type"]}".`>
+                : {
+                    readonly name: param["name"];
+                    readonly type: "flags";
+                    readonly internalType: param["type"];
+                    readonly components: EnumToComponents<flags[param["type"]]>;
+                  }
+              : param
+            : param
+        : [flags] extends [FlagsLookup]
+          ? param["type"] extends keyof flags
+            ? param["type"] extends keyof keyReferences
+              ? Error_<`Circular reference detected at "${param["type"]}".`>
+              : {
+                  readonly name: param["name"];
+                  readonly type: "flags";
+                  readonly internalType: param["type"];
+                  readonly components: EnumToComponents<flags[param["type"]]>;
+                }
+            : param
+          : param;
 
 export type EnumToComponents<cases extends readonly string[]> = readonly [
   ...{
@@ -355,32 +724,37 @@ export type EnumToComponents<cases extends readonly string[]> = readonly [
 
 export type ParseTypes<signatures extends readonly string[]> =
   ParseEnums<signatures> extends infer enums extends EnumLookup
-    ? ParseRecords<signatures, {}, enums> extends infer shallowRecords extends
-        ComponentLookup
-      ? ParseVariants<
-          signatures,
-          enums,
-          {}
-        > extends infer shallowVariants extends ComponentLookup
-        ? {
-            records: {
-              [K in keyof shallowRecords]: ResolveTypes<
-                shallowRecords[K],
-                shallowRecords,
-                shallowVariants,
-                enums
-              >;
-            };
-            variants: {
-              [K in keyof shallowVariants]: ResolveTypes<
-                shallowVariants[K],
-                shallowRecords,
-                shallowVariants,
-                enums
-              >;
-            };
-            enums: enums;
-          }
+    ? ParseFlags<signatures> extends infer flags extends FlagsLookup
+      ? ParseRecords<signatures, {}, enums> extends infer shallowRecords extends
+          ComponentLookup
+        ? ParseVariants<
+            signatures,
+            enums,
+            {}
+          > extends infer shallowVariants extends ComponentLookup
+          ? {
+              records: {
+                [K in keyof shallowRecords]: ResolveTypes<
+                  shallowRecords[K],
+                  shallowRecords,
+                  shallowVariants,
+                  enums,
+                  flags
+                >;
+              };
+              variants: {
+                [K in keyof shallowVariants]: ResolveTypes<
+                  shallowVariants[K],
+                  shallowRecords,
+                  shallowVariants,
+                  enums,
+                  flags
+                >;
+              };
+              enums: enums;
+              flags: flags;
+            }
+          : never
         : never
       : never
     : never;

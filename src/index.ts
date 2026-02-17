@@ -10,6 +10,7 @@ export {
   type WitRecord,
   type WitVariant,
   type WitEnum,
+  type WitFlag,
   type WitError,
   type WitUnit,
   type WitBool,
@@ -82,10 +83,12 @@ export {
   isRecordSignature,
   isVariantSignature,
   isEnumSignature,
+  isFlagsSignature,
   execFunctionSignature,
   execRecordSignature,
   execVariantSignature,
   execEnumSignature,
+  execFlagsSignature,
 } from "./parser/core/signatures.js";
 
 export {
@@ -115,6 +118,8 @@ export {
   type IsRecordSignature,
   type IsVariantSignature,
   type IsEnumSignature,
+  type IsFlagsSignature,
+  type FlagsSignature,
   type IsName,
   type ValidateName,
   type WitKeyword,
@@ -123,6 +128,7 @@ export {
 export {
   type ParseTypes,
   type ParseEnums,
+  type ParseFlags,
   type ParseRecords,
   type ParseVariants,
   type ResolveTypes,
@@ -130,6 +136,7 @@ export {
   type RecordLookup,
   type VariantLookup,
   type EnumLookup,
+  type FlagsLookup,
   type ComponentLookup,
 } from "./parser/core/types/user-defined.js";
 

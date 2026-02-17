@@ -13,6 +13,7 @@ import { execFunctionSignature, isFunctionSignature } from "./signatures.js";
 import type {
   EnumLookup,
   EnumToComponents,
+  FlagsLookup,
   RecordLookup,
   VariantLookup,
 } from "./types/user-defined.js";
@@ -21,7 +22,8 @@ export type ParseOptions = {
   records?: RecordLookup;
   variants?: VariantLookup;
   enums?: EnumLookup;
-  type?: WitItemType | "record" | "variant" | "enum";
+  flags?: FlagsLookup;
+  type?: WitItemType | "record" | "variant" | "enum" | "flags";
   ancestors?: Set<string>;
 };
 
@@ -58,6 +60,7 @@ export function parseWitParameter(param: string, options?: ParseOptions) {
   const records = options?.records ?? {};
   const variants = options?.variants ?? {};
   const enums = options?.enums ?? {};
+  const flags = options?.flags ?? {};
   const ancestors = options?.ancestors ?? new Set<string>();
 
   let type: string;
@@ -67,7 +70,7 @@ export function parseWitParameter(param: string, options?: ParseOptions) {
     const parts = splitParameters(g.inner);
 
     const parsed = parts.map((p) =>
-      parseWitParameter(p, { records, variants, enums, ancestors }),
+      parseWitParameter(p, { records, variants, enums, flags, ancestors }),
     );
 
     // normalize inner types for the outer type string
@@ -122,6 +125,10 @@ export function parseWitParameter(param: string, options?: ParseOptions) {
     // scalar that maps to an enum in `enums`
     type = "enum";
     components = { components: enumToComponents(enums[match.type]!) };
+  } else if (match.type in flags) {
+    // scalar that maps to a flags in `flags`
+    type = "flags";
+    components = { components: enumToComponents(flags[match.type]!) };
   } else {
     type = match.type;
   }
@@ -191,9 +198,10 @@ export function parseSignature(
   records: RecordLookup = {},
   variants: VariantLookup = {},
   enums: EnumLookup = {},
+  flags: FlagsLookup = {},
 ) {
   if (isFunctionSignature(signature))
-    return parseFunctionSignature(signature, records, variants, enums);
+    return parseFunctionSignature(signature, records, variants, enums, flags);
 
   throw new UnknownSignatureError({ signature });
 }
@@ -203,6 +211,7 @@ export function parseFunctionSignature(
   records: RecordLookup = {},
   variants: VariantLookup = {},
   enums: EnumLookup = {},
+  flags: FlagsLookup = {},
 ) {
   const match = execFunctionSignature(signature);
   if (!match) throw new InvalidSignatureError({ signature, type: "func" });
@@ -217,6 +226,7 @@ export function parseFunctionSignature(
           records,
           variants,
           enums,
+          flags,
         }),
       );
     }
@@ -232,6 +242,7 @@ export function parseFunctionSignature(
           records,
           variants,
           enums,
+          flags,
         }),
       );
     }

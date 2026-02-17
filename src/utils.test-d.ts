@@ -46,3 +46,17 @@ test("WitClient - list-posts has correct signature", () => {
     (limit: number) => Promise<readonly { title: string; body: string }[]>
   >();
 });
+
+// Flags primitive type mapping
+const witWithFlags = [
+  "flags permissions { read, write, exec }",
+  "check-access: func(p: permissions) -> bool;",
+] as const;
+
+type FlagsClient = WitClient<ParseWit<typeof witWithFlags>>;
+
+test("WitClient - flags parameter maps to record of booleans", () => {
+  expectTypeOf<FlagsClient["check-access"]>().toEqualTypeOf<
+    (p: { read: boolean; write: boolean; exec: boolean }) => Promise<boolean>
+  >();
+});

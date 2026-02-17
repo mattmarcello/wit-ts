@@ -89,7 +89,17 @@ type FormatTypeDefinition<
       ? `variant ${name} { ${Join<FormatVariantCases<C>>} }`
       : ExtractBaseType<param["type"]> extends "enum"
         ? `enum ${name} { ${Join<FormatEnumCases<C>>} }`
-        : never
+        : ExtractBaseType<param["type"]> extends "flags"
+          ? `flags ${name} { ${Join<FormatFlagsCases<C>>} }`
+          : never
+  : never;
+
+type FormatFlagsCases<params extends readonly WitParameter[]> = {
+  [K in keyof params]: params[K] extends { name: infer N extends string }
+    ? N
+    : never;
+} extends infer R extends readonly string[]
+  ? R
   : never;
 
 // Check if a type is a user-defined type
@@ -97,6 +107,7 @@ type IsUserDefinedType<T extends string> = ExtractBaseType<T> extends
   | "record"
   | "variant"
   | "enum"
+  | "flags"
   ? true
   : false;
 

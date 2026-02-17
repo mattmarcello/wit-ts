@@ -203,3 +203,27 @@ describe("formatWit", () => {
     expect(result).toContain("g: func() -> option<aa>;");
   });
 });
+
+describe("formatWit - flags", () => {
+  test("round-trips flags", () => {
+    const sigs = [
+      "flags permissions { read, write, exec }",
+      "check-perms: func(p: permissions) -> bool;",
+    ] as const;
+
+    const result = formatWit(parseWit(sigs));
+    expect(result).toContain("flags permissions { read, write, exec }");
+    expect(result).toContain("check-perms: func(p: permissions) -> bool;");
+  });
+
+  test("round-trips flags in list wrapper", () => {
+    const sigs = [
+      "flags permissions { read, write, exec }",
+      "get-perms: func() -> list<permissions>;",
+    ] as const;
+
+    const result = formatWit(parseWit(sigs));
+    expect(result).toContain("flags permissions { read, write, exec }");
+    expect(result).toContain("get-perms: func() -> list<permissions>;");
+  });
+});

@@ -12,6 +12,7 @@ import type {
   WitResult,
   WitVariant,
   WitEnum,
+  WitFlag,
 } from "./wit.js";
 import type { ResolvedRegister } from "./register.js";
 import type { Merge, Prettify } from "./type-utils.js";
@@ -52,6 +53,7 @@ interface PrimitiveTypeLookup
   record: Record<string, unknown>;
   variant: [string, unknown];
   enum: string;
+  flags: Record<string, boolean>;
   error: unknown;
 }
 
@@ -77,7 +79,7 @@ type BitsTypeLookup = {
 
 type WitBasicType = Exclude<
   WitType,
-  WitRecord | WitList | WitResult | WitOption | WitVariant | WitEnum
+  WitRecord | WitList | WitResult | WitOption | WitVariant | WitEnum | WitFlag
 >;
 
 export type WitParametersToPrimitiveTypes<
@@ -161,7 +163,13 @@ export type WitParameterToPrimitiveType<
           }
           ? WitEnumToPrimitiveType<components>
           : never
-        : // 4. Explicit record with components
+        : // 3b. Flags (record of booleans)
+          witParameter extends {
+              type: "flags";
+              components?: infer components extends readonly WitParameter[];
+            }
+          ? WitFlagsToPrimitiveType<components>
+          : // 4. Explicit record with components
           witParameter extends {
               type: WitRecord;
               components: infer components extends readonly WitParameter[];
@@ -221,6 +229,12 @@ type WitEnumToPrimitiveType<components extends readonly WitParameter[]> =
         : never
       : never;
   }>[number];
+
+type WitFlagsToPrimitiveType<components extends readonly WitParameter[]> = {
+  [K in components[number] as K extends { name: infer N extends string }
+    ? N
+    : never]: boolean;
+};
 
 type WitComponentsToPrimitiveType<
   components extends readonly WitParameter[],

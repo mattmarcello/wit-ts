@@ -9,7 +9,7 @@ export class InvalidSignatureError extends BaseError {
     type,
   }: {
     signature: string;
-    type: WitItemType | "record" | "variant" | "enum";
+    type: WitItemType | "record" | "variant" | "enum" | "flags";
   }) {
     super(`Invalid ${type} signature.`, {
       details: signature,

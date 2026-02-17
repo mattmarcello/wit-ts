@@ -595,4 +595,69 @@ describe("parseTypes - error handling", () => {
       "Invalid enum case: x(string). Enums cannot have payloads.",
     );
   });
+
+  test("namespace collision: flags and record", () => {
+    expect(() =>
+      parseTypes([
+        "flags aa { read, write }",
+        "record aa { a: string }",
+      ]),
+    ).toThrow('Namespace collision: "aa" is both record and flags.');
+  });
+
+  test("rejects flags with payload", () => {
+    expect(() =>
+      parseTypes(["flags ff { x(string), y, z }"]),
+    ).toThrow(
+      "Invalid flags case: x(string). Flags cannot have payloads.",
+    );
+  });
+});
+
+describe("parseTypes - flags", () => {
+  test("simple flags", () => {
+    const result = parseTypes(["flags permissions { read, write, exec }"]);
+    expect(result.flags).toEqual({
+      permissions: ["read", "write", "exec"],
+    });
+  });
+
+  test("function using flags param", () => {
+    const result = parseTypes([
+      "flags permissions { read, write, exec }",
+      "record file { name: string, perms: permissions }",
+    ]);
+
+    expect(result.records.file).toEqual([
+      { name: "name", type: "string", internalType: "string" },
+      {
+        name: "perms",
+        type: "flags",
+        internalType: "permissions",
+        components: [
+          { name: "read", type: "_" },
+          { name: "write", type: "_" },
+          { name: "exec", type: "_" },
+        ],
+      },
+    ]);
+  });
+
+  test("flags in list wrapper", () => {
+    const result = parseTypes([
+      "flags permissions { read, write, exec }",
+      "record multi { perms: list<permissions> }",
+    ]);
+
+    expect(result.records.multi![0]).toEqual({
+      name: "perms",
+      type: "list<flags>",
+      internalType: "list<permissions>",
+      components: [
+        { name: "read", type: "_" },
+        { name: "write", type: "_" },
+        { name: "exec", type: "_" },
+      ],
+    });
+  });
 });

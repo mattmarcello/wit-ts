@@ -220,3 +220,34 @@ test("ParseWit - function with variant input", () => {
   expectTypeOf<F["outputs"]["length"]>().toEqualTypeOf<1>();
   expectTypeOf<F["outputs"][0]["type"]>().toEqualTypeOf<"result<string, error>">();
 });
+
+describe("parseWit - flags", () => {
+  test("parses function with flags parameter", () => {
+    const out = parseWit([
+      "flags permissions { read, write, exec }",
+      "check-perms: func(p: permissions) -> bool;",
+    ]);
+
+    expect(out).toEqual([
+      {
+        name: "check-perms",
+        type: "function",
+        inputs: [
+          {
+            name: "p",
+            type: "flags",
+            internalType: "permissions",
+            components: [
+              { name: "read", type: "_", internalType: "_" },
+              { name: "write", type: "_", internalType: "_" },
+              { name: "exec", type: "_", internalType: "_" },
+            ],
+          },
+        ],
+        outputs: [
+          { type: "bool", internalType: "bool" },
+        ],
+      },
+    ]);
+  });
+});

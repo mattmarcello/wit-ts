@@ -71,3 +71,17 @@ export function execEnumSignature(signature: string) {
     cases: string;
   }>(witEnumSignatureRegex, signature);
 }
+
+const witFlagsSignatureRegex =
+  /^flags\s+(?<name>[a-zA-Z$_][a-zA-Z0-9$_-]*)\s*\{(?<cases>[\s\S]*?)\}$/;
+
+export function isFlagsSignature(signature: string) {
+  return witFlagsSignatureRegex.test(signature);
+}
+
+export function execFlagsSignature(signature: string) {
+  return execTyped<{
+    name: string;
+    cases: string;
+  }>(witFlagsSignatureRegex, signature);
+}
