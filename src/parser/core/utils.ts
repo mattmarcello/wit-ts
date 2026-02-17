@@ -59,9 +59,6 @@ export const witParameterSeed: ReadonlyMap<string, WitParameter> = new Map([
   // String / char
   ["string", primitiveParam("string")],
   ["char", primitiveParam("char")],
-  // Unit / error
-  ["_", primitiveParam("_")],
-  ["error", primitiveParam("error")],
 ]);
 
 export const witParameterRegex =
