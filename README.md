@@ -14,6 +14,45 @@ pnpm add wit-ts
 
 wit-ts provides **dual parsing** — every parser has a runtime implementation and a type-level counterpart using template literal types. Parse WIT signatures into structured objects, format them back to strings, and extract TypeScript types from them.
 
+### Example: typed API client from WIT strings
+
+Define your interface as plain strings — get a fully typed client with zero codegen:
+
+```ts
+import type {
+  ParseWit,
+  ExtractWitFunctions,
+  WitParameterToPrimitiveType,
+  WitParametersToPrimitiveTypes,
+  Wit,
+} from "wit-ts";
+
+// 1. Define WIT signatures as string literals
+const wit = [
+  "record user { name: string, age: u32 }",
+  "record post { title: string, body: string }",
+  "get-user: func(id: u64) -> user;",
+  "create-post: func(author: user, post: post) -> result<post, error>;",
+  "list-posts: func(limit: u32) -> list<post>;",
+] as const;
+
+// 2. Derive a typed client interface — no codegen, pure types
+type WitClient<wit extends Wit> = {
+  [fn in ExtractWitFunctions<wit> as fn["name"]]: (
+    ...args: WitParametersToPrimitiveTypes<fn["inputs"]>
+  ) => Promise<WitParameterToPrimitiveType<fn["outputs"][0]>>;
+};
+
+type MyClient = WitClient<ParseWit<typeof wit>>;
+//   ^? {
+//        "get-user":    (id: bigint) => Promise<{ name: string; age: number }>;
+//        "create-post": (author: { name: string; age: number }, post: { ... }) => Promise<["ok", { title: string; body: string }] | ["err", ...]>;
+//        "list-posts":  (limit: number) => Promise<readonly { title: string; body: string }[]>;
+//      }
+```
+
+Change a WIT string, and every call site updates — the same idea as [abitype](https://github.com/wevm/abitype) for Ethereum ABIs, applied to WebAssembly interfaces.
+
 ## Parse
 
 ### `parseWit`
